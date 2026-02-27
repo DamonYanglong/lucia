@@ -55,7 +55,7 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
         count() as requestCount,
         countIf(StatusCode = 'Error') as errorCount,
         avg(Duration) as avgDuration
-      FROM otel_traces
+      FROM open_telemetry_traces
       WHERE Timestamp >= {startTime:DateTime} AND Timestamp <= {endTime:DateTime}
       GROUP BY ServiceName
       ORDER BY requestCount DESC
@@ -69,7 +69,8 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
       },
     });
     
-    return result.json();
+    const data = await result.json() as any;
+    return data.data || [];
   }
 
   async getTraces(query: TraceQuery): Promise<PaginatedResult<TraceListItem>> {
@@ -91,7 +92,7 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
     const pageSize = query.pageSize || 20;
     const offset = (page - 1) * pageSize;
     
-    const countSql = `SELECT count(DISTINCT TraceId) as total FROM otel_traces WHERE ${conditions.join(' AND ')}`;
+    const countSql = `SELECT count(DISTINCT TraceId) as total FROM open_telemetry_traces WHERE ${conditions.join(' AND ')}`;
     const countResult = await this.client.query({
       query: countSql,
       query_params: {
@@ -112,7 +113,7 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
         Duration as duration,
         StatusCode as statusCode,
         Timestamp as timestamp
-      FROM otel_traces
+      FROM open_telemetry_traces
       WHERE ${conditions.join(' AND ')}
       ORDER BY Timestamp DESC
       LIMIT ${pageSize} OFFSET ${offset}
@@ -142,7 +143,7 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
     // Use auxiliary table for efficient trace lookup
     const timeRangeSql = `
       SELECT min(Start) as start, max(End) as end
-      FROM otel_traces_trace_id_ts
+      FROM open_telemetry_traces_trace_id_ts
       WHERE TraceId = {traceId:String}
     `;
     
@@ -160,7 +161,7 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
     
     const sql = `
       SELECT *
-      FROM otel_traces
+      FROM open_telemetry_traces
       WHERE TraceId = {traceId:String}
         AND Timestamp >= {start:DateTime}
         AND Timestamp <= {end:DateTime}
@@ -227,7 +228,7 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
         ServiceName as serviceName,
         SpanName as spanName,
         StatusMessage as statusMessage
-      FROM otel_traces
+      FROM open_telemetry_traces
       WHERE ${conditions.join(' AND ')}
       ORDER BY Timestamp DESC
       LIMIT ${pageSize} OFFSET ${offset}
@@ -245,7 +246,7 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
     const data = await result.json() as any;
     
     // Get total count
-    const countSql = `SELECT count() as total FROM otel_traces WHERE ${conditions.join(' AND ')}`;
+    const countSql = `SELECT count() as total FROM open_telemetry_traces WHERE ${conditions.join(' AND ')}`;
     const countResult = await this.client.query({
       query: countSql,
       query_params: {
@@ -278,7 +279,7 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
         ServiceName as serviceName,
         count() as count,
         max(Timestamp) as lastOccurrence
-      FROM otel_traces
+      FROM open_telemetry_traces
       WHERE ${conditions.join(' AND ')}
       GROUP BY StatusMessage, ServiceName
       ORDER BY count DESC
@@ -315,7 +316,7 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
         ServiceName as serviceName,
         SpanName as spanName,
         Duration as duration
-      FROM otel_traces
+      FROM open_telemetry_traces
       WHERE ${conditions.join(' AND ')}
       ORDER BY Duration DESC
       LIMIT ${limit}

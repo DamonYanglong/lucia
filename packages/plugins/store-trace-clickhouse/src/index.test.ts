@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ClickHouseTracePlugin } from './index.js';
-import type { Span } from '@lucia/core';
 
 // Mock ClickHouse client
 const mockClient = {
@@ -11,58 +10,6 @@ const mockClient = {
 vi.mock('@clickhouse/client', () => ({
   createClient: vi.fn(() => mockClient),
 }));
-
-// Test fixture data
-const mockSpans: Span[] = [
-  {
-    timestamp: '2024-01-01T00:00:00.000Z',
-    traceId: 'trace-1',
-    spanId: 'span-1',
-    parentSpanId: null,
-    spanName: 'HTTP GET /api/users',
-    spanKind: 'SERVER',
-    serviceName: 'user-service',
-    duration: 100000000,
-    statusCode: 'Ok',
-    statusMessage: '',
-    spanAttributes: { 'http.method': 'GET', 'http.url': '/api/users' },
-    resourceAttributes: { 'service.name': 'user-service' },
-    events: [],
-    links: [],
-  },
-  {
-    timestamp: '2024-01-01T00:00:00.100Z',
-    traceId: 'trace-1',
-    spanId: 'span-2',
-    parentSpanId: 'span-1',
-    spanName: 'DB Query',
-    spanKind: 'CLIENT',
-    serviceName: 'user-service',
-    duration: 50000000,
-    statusCode: 'Ok',
-    statusMessage: '',
-    spanAttributes: { 'db.system': 'postgresql' },
-    resourceAttributes: {},
-    events: [],
-    links: [],
-  },
-  {
-    timestamp: '2024-01-01T00:00:00.150Z',
-    traceId: 'trace-2',
-    spanId: 'span-3',
-    parentSpanId: null,
-    spanName: 'HTTP POST /api/orders',
-    spanKind: 'SERVER',
-    serviceName: 'order-service',
-    duration: 200000000,
-    statusCode: 'Error',
-    statusMessage: 'Connection refused',
-    spanAttributes: { 'http.method': 'POST' },
-    resourceAttributes: {},
-    events: [{ timestamp: '2024-01-01T00:00:00.160Z', name: 'exception', attributes: {} }],
-    links: [],
-  },
-];
 
 describe('ClickHouseTracePlugin', () => {
   let plugin: ClickHouseTracePlugin;

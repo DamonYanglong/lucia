@@ -23,7 +23,12 @@ async function main() {
   const config = await loadConfig();
   
   // Load store plugins
-  storePlugins = await loadPlugins(config.store);
+  try {
+    storePlugins = await loadPlugins(config.store);
+  } catch (err) {
+    fastify.log.error(err, 'Failed to load plugins');
+    process.exit(1);
+  }
   
   // Register CORS
   await fastify.register(cors, {

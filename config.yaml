@@ -8,11 +8,11 @@ store:
   trace:
     plugin: clickhouse
     config:
-      host: ${CLICKHOUSE_HOST:localhost}
-      port: ${CLICKHOUSE_PORT:9000}
-      database: ${CLICKHOUSE_DATABASE:default}
-      username: ${CLICKHOUSE_USERNAME:default}
-      password: ${CLICKHOUSE_PASSWORD:}
+      host: localhost
+      port: 8123
+      database: hawk
+      username: open-telemetry-ck
+      password: "open-telemetry-ck-12345"
 
 log:
   level: info

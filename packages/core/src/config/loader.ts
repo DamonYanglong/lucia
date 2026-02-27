@@ -41,13 +41,22 @@ function envNumber(key: string, defaultValue: number): number {
 }
 
 export async function loadConfig(): Promise<Config> {
-  const configPath = envOrDefault('LUCIA_CONFIG', 'config.yaml');
+  // Try multiple config paths
+  const configPaths = [
+    process.env.LUCIA_CONFIG,
+    'config.yaml',
+    '../../config.yaml',  // When running from packages/core
+    '../config.yaml',      // When running from packages/
+  ].filter(Boolean) as string[];
   
   let fileConfig: Partial<Config> = {};
   
-  if (existsSync(configPath)) {
-    const content = await readFile(configPath, 'utf-8');
-    fileConfig = parse(content);
+  for (const configPath of configPaths) {
+    if (existsSync(configPath)) {
+      const content = await readFile(configPath, 'utf-8');
+      fileConfig = parse(content);
+      break;
+    }
   }
   
   // Environment variable overrides
