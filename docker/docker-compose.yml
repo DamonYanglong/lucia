@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  lucia:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST:-localhost}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT:-9000}
+      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-default}
+      - CLICKHOUSE_USERNAME=${CLICKHOUSE_USERNAME:-default}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -1,0 +1,33 @@
+{
+  "name": "lucia",
+  "version": "0.1.0",
+  "description": "Lightweight APM for developers",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "build:frontend": "pnpm --filter @lucia/frontend build",
+    "dev": "pnpm --filter @lucia/core dev",
+    "dev:frontend": "pnpm --filter @lucia/frontend dev",
+    "lint": "eslint packages",
+    "test": "pnpm -r test",
+    "clean": "rm -rf dist packages/*/dist"
+  },
+  "keywords": [
+    "apm",
+    "observability",
+    "opentelemetry",
+    "tracing"
+  ],
+  "author": "Damon Yang",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  }
+}

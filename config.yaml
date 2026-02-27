@@ -1,0 +1,18 @@
+# Lucia Configuration
+
+server:
+  port: 3000
+  host: 0.0.0.0
+
+store:
+  trace:
+    plugin: clickhouse
+    config:
+      host: ${CLICKHOUSE_HOST:localhost}
+      port: ${CLICKHOUSE_PORT:9000}
+      database: ${CLICKHOUSE_DATABASE:default}
+      username: ${CLICKHOUSE_USERNAME:default}
+      password: ${CLICKHOUSE_PASSWORD:}
+
+log:
+  level: info
