@@ -32,7 +32,7 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
   private config: ClickHouseConfig | null = null;
 
   async init(config: Record<string, unknown>): Promise<void> {
-    this.config = config as ClickHouseConfig;
+    this.config = config as unknown as ClickHouseConfig;
     
     this.client = createClient({
       host: `http://${this.config.host}:${this.config.port}`,

@@ -10,27 +10,27 @@ const router = createRouter({
     {
       path: '/services',
       name: 'Services',
-      component: () => import('./views/Services.vue'),
+      component: () => import('@/views/Services.vue'),
     },
     {
       path: '/traces',
       name: 'Traces',
-      component: () => import('./views/Traces.vue'),
+      component: () => import('@/views/Traces.vue'),
     },
     {
       path: '/traces/:traceId',
       name: 'TraceDetail',
-      component: () => import('./views/TraceDetail.vue'),
+      component: () => import('@/views/TraceDetail.vue'),
     },
     {
       path: '/errors',
       name: 'Errors',
-      component: () => import('./views/Errors.vue'),
+      component: () => import('@/views/Errors.vue'),
     },
     {
       path: '/slow',
       name: 'SlowCalls',
-      component: () => import('./views/SlowCalls.vue'),
+      component: () => import('@/views/SlowCalls.vue'),
     },
   ],
 });

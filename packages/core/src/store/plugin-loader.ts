@@ -1,41 +1,32 @@
 import type { StorePlugins } from './interface';
+import type { Config } from '../config';
 
-interface StoreConfig {
-  trace?: {
-    plugin: string;
-    config: Record<string, unknown>;
-  };
-  metric?: {
-    plugin: string;
-    config: Record<string, unknown>;
-  };
-  log?: {
-    plugin: string;
-    config: Record<string, unknown>;
-  };
-}
+type StoreConfig = Config['store'];
 
 export async function loadPlugins(storeConfig: StoreConfig): Promise<StorePlugins> {
   const plugins: StorePlugins = {};
-  
+
   // Load Trace plugin
   if (storeConfig.trace) {
-    plugins.trace = await loadPlugin('trace', storeConfig.trace.plugin);
-    await plugins.trace.init(storeConfig.trace.config);
+    const tracePlugin = await loadPlugin('trace', storeConfig.trace.plugin);
+    await tracePlugin.init(storeConfig.trace.config);
+    plugins.trace = tracePlugin;
   }
-  
+
   // Load Metric plugin (future)
   if (storeConfig.metric) {
-    plugins.metric = await loadPlugin('metric', storeConfig.metric.plugin);
-    await plugins.metric.init(storeConfig.metric.config);
+    const metricPlugin = await loadPlugin('metric', storeConfig.metric.plugin);
+    await metricPlugin.init(storeConfig.metric.config);
+    plugins.metric = metricPlugin;
   }
-  
+
   // Load Log plugin (future)
   if (storeConfig.log) {
-    plugins.log = await loadPlugin('log', storeConfig.log.plugin);
-    await plugins.log.init(storeConfig.log.config);
+    const logPlugin = await loadPlugin('log', storeConfig.log.plugin);
+    await logPlugin.init(storeConfig.log.config);
+    plugins.log = logPlugin;
   }
-  
+
   return plugins;
 }
 
@@ -46,11 +37,18 @@ async function loadPlugin(type: 'trace' | 'metric' | 'log', name: string): Promi
     metric: ['prometheus'],
     log: ['clickhouse'],
   };
-  
+
+  let module: any;
   if (builtin[type]?.includes(name)) {
-    return import(`@lucia/plugin-store-${type}-${name}`);
+    const packageName = type === 'trace'
+      ? `@lucia/plugin-store-trace-${name}`
+      : `@lucia/plugin-store-${type}-${name}`;
+    module = await import(packageName);
+  } else {
+    // External plugins
+    module = await import(`lucia-plugin-store-${type}-${name}`);
   }
-  
-  // External plugins
-  return import(`lucia-plugin-store-${type}-${name}`);
+
+  // Handle both default exports and named exports
+  return module.default || module;
 }

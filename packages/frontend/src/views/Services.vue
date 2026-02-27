@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useFilterStore } from '../stores/filter';
-import type { Service } from '@lucia/core';
+import type { Service } from '../api';
 
 const filterStore = useFilterStore();
 const services = ref<Service[]>([]);
