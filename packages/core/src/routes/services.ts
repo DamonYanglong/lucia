@@ -1,22 +1,42 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { storePlugins } from '../app';
-import type { ServiceQuery } from '../types';
+import { serviceQuerySchema } from '../schemas';
+import { createError, createSuccess, ApiError, ErrorCodes } from '../middleware/errorHandler';
 
 const servicesRoutes: FastifyPluginAsync = async (fastify) => {
   // Get services list
   fastify.get('/services', async (request, reply) => {
-    const query = request.query as ServiceQuery;
-    
-    if (!storePlugins.trace) {
-      return reply.code(503).send({ code: 503, message: 'Trace store not configured' });
+    try {
+      // Validate query parameters
+      const parseResult = serviceQuerySchema.safeParse(request.query);
+
+      if (!parseResult.success) {
+        return reply.code(400).send(createError(
+          ErrorCodes.INVALID_QUERY,
+          'Invalid query parameters',
+          parseResult.error.issues
+        ));
+      }
+
+      const query = parseResult.data;
+
+      if (!storePlugins.trace) {
+        return reply.code(503).send(createError(
+          ErrorCodes.SERVICE_UNAVAILABLE,
+          'Trace store not configured'
+        ));
+      }
+
+      const services = await storePlugins.trace.getServices({
+        startTime: query.startTime,
+        endTime: query.endTime,
+      });
+
+      return createSuccess(services);
+    } catch (error) {
+      request.log.error({ error }, 'Failed to get services');
+      throw new ApiError(ErrorCodes.DATABASE_ERROR, 'Failed to retrieve services');
     }
-    
-    const services = await storePlugins.trace.getServices({
-      startTime: query.startTime,
-      endTime: query.endTime,
-    });
-    
-    return { code: 0, data: services };
   });
 };
 

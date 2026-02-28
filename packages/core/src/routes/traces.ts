@@ -1,44 +1,94 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { storePlugins } from '../app';
-import type { TraceQuery } from '../types';
+import { traceQuerySchema, traceIdParamsSchema } from '../schemas';
+import { createError, createSuccess, ApiError, ErrorCodes } from '../middleware/errorHandler';
 
 const tracesRoutes: FastifyPluginAsync = async (fastify) => {
   // Get traces list
   fastify.get('/traces', async (request, reply) => {
-    const query = request.query as TraceQuery;
-    
-    if (!storePlugins.trace) {
-      return reply.code(503).send({ code: 503, message: 'Trace store not configured' });
+    try {
+      // Validate query parameters
+      const parseResult = traceQuerySchema.safeParse(request.query);
+
+      if (!parseResult.success) {
+        return reply.code(400).send(createError(
+          ErrorCodes.INVALID_QUERY,
+          'Invalid query parameters',
+          parseResult.error.issues
+        ));
+      }
+
+      const query = parseResult.data;
+
+      if (!storePlugins.trace) {
+        return reply.code(503).send(createError(
+          ErrorCodes.SERVICE_UNAVAILABLE,
+          'Trace store not configured'
+        ));
+      }
+
+      const result = await storePlugins.trace.getTraces({
+        service: query.service,
+        traceId: query.traceId,
+        spanName: query.spanName,
+        status: query.status,
+        startTime: query.startTime,
+        endTime: query.endTime,
+        page: query.page,
+        pageSize: query.pageSize,
+        minDuration: query.minDuration,
+        maxDuration: query.maxDuration,
+        httpStatusCode: query.httpStatusCode,
+        tags: query.tags,
+      });
+
+      return createSuccess(result);
+    } catch (error) {
+      request.log.error({ error }, 'Failed to get traces');
+      throw new ApiError(ErrorCodes.DATABASE_ERROR, 'Failed to retrieve traces');
     }
-    
-    const result = await storePlugins.trace.getTraces({
-      service: query.service,
-      traceId: query.traceId,
-      status: query.status || 'all',
-      startTime: query.startTime,
-      endTime: query.endTime,
-      page: query.page || 1,
-      pageSize: query.pageSize || 20,
-    });
-    
-    return { code: 0, data: result };
   });
-  
+
   // Get trace by ID
   fastify.get('/traces/:traceId', async (request, reply) => {
-    const { traceId } = request.params as { traceId: string };
-    
-    if (!storePlugins.trace) {
-      return reply.code(503).send({ code: 503, message: 'Trace store not configured' });
+    try {
+      // Validate path parameters
+      const parseResult = traceIdParamsSchema.safeParse(request.params);
+
+      if (!parseResult.success) {
+        return reply.code(400).send(createError(
+          ErrorCodes.INVALID_PARAMS,
+          'Invalid trace ID',
+          parseResult.error.issues
+        ));
+      }
+
+      const { traceId } = parseResult.data;
+
+      if (!storePlugins.trace) {
+        return reply.code(503).send(createError(
+          ErrorCodes.SERVICE_UNAVAILABLE,
+          'Trace store not configured'
+        ));
+      }
+
+      const trace = await storePlugins.trace.getTraceById(traceId);
+
+      if (!trace) {
+        return reply.code(404).send(createError(
+          ErrorCodes.TRACE_NOT_FOUND,
+          'Trace not found'
+        ));
+      }
+
+      return createSuccess(trace);
+    } catch (error) {
+      request.log.error({ error }, 'Failed to get trace by ID');
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError(ErrorCodes.DATABASE_ERROR, 'Failed to retrieve trace');
     }
-    
-    const trace = await storePlugins.trace.getTraceById(traceId);
-    
-    if (!trace) {
-      return reply.code(404).send({ code: 404, message: 'Trace not found' });
-    }
-    
-    return { code: 0, data: trace };
   });
 };
 

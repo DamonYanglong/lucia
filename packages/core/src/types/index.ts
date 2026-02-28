@@ -8,7 +8,7 @@ export interface Span {
   spanKind: string;
   serviceName: string;
   duration: number;
-  statusCode: 'Unset' | 'Ok' | 'Error';
+  statusCode: string;
   statusMessage: string;
   spanAttributes: Record<string, string>;
   resourceAttributes: Record<string, string>;
@@ -34,18 +34,23 @@ export interface Trace {
   rootSpan: Span;
   duration: number;
   spanCount: number;
-  statusCode: 'Unset' | 'Ok' | 'Error';
+  statusCode: string;
 }
 
 // Query types
 export interface TraceQuery {
   service?: string;
   traceId?: string;
+  spanName?: string;
   status?: 'all' | 'error' | 'ok';
   startTime: string;
   endTime: string;
   page?: number;
   pageSize?: number;
+  minDuration?: string;
+  maxDuration?: string;
+  httpStatusCode?: string;
+  tags?: string;
 }
 
 export interface ServiceQuery {

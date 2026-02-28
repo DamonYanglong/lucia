@@ -2,11 +2,14 @@
 import { ref, onMounted, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useFilterStore } from '../stores/filter';
+import { useTimezoneStore } from '../stores/timezone';
 import type { ErrorItem, ErrorGroup } from '../api';
-import { formatDate } from '../api';
+import TimeSelector from '../components/TimeSelector.vue';
+import ServiceFilter from '../components/ServiceFilter.vue';
 
 const router = useRouter();
 const filterStore = useFilterStore();
+const timezoneStore = useTimezoneStore();
 
 const errors = ref<ErrorItem[]>([]);
 const errorGroups = ref<ErrorGroup[]>([]);
@@ -16,6 +19,19 @@ const total = ref(0);
 const page = ref(1);
 const pageSize = ref(20);
 const activeTab = ref('list');
+
+// 计算统计数据
+const stats = computed(() => {
+  const totalErrors = errors.value.length;
+  const servicesWithErrors = new Set(errors.value.map(e => e.serviceName)).size;
+  const uniqueMessages = new Set(errors.value.map(e => e.statusMessage)).size;
+
+  return {
+    totalErrors,
+    servicesWithErrors,
+    uniqueMessages,
+  };
+});
 
 onMounted(async () => {
   await loadServices();
@@ -116,24 +132,51 @@ const aggregatedErrors = computed(() => {
 
 <template>
   <div class="errors-page">
-    <div class="header">
-      <h2>Errors</h2>
-      <div class="filters">
-        <TimeSelector />
-        <ServiceFilter :services="services" />
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value text-error">{{ stats.totalErrors }}</div>
+        <div class="stat-label">Total Errors</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.servicesWithErrors }}</div>
+        <div class="stat-label">Affected Services</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.uniqueMessages }}</div>
+        <div class="stat-label">Unique Errors</div>
       </div>
     </div>
 
-    <el-tabs v-model="activeTab" @tab-change="loadData">
-      <el-tab-pane label="Error List" name="list">
-        <div class="tab-content">
-          <el-table :data="errors" v-loading="loading" stripe>
-            <el-table-column prop="serviceName" label="Service" width="150" />
-            <el-table-column prop="spanName" label="Operation" width="200" />
-            <el-table-column prop="statusMessage" label="Error Message" min-width="300" show-overflow-tooltip />
+    <!-- 过滤器 -->
+    <div class="filters card">
+      <TimeSelector />
+      <ServiceFilter :services="services" />
+    </div>
+
+    <!-- 标签页 -->
+    <div class="card">
+      <el-tabs v-model="activeTab" @tab-change="loadData">
+        <el-tab-pane label="Error List" name="list">
+          <el-table :data="errors" v-loading="loading">
+            <el-table-column prop="serviceName" label="Service" width="160">
+              <template #default="{ row }">
+                <el-tag size="small" effect="dark" type="info">{{ row.serviceName }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="spanName" label="Operation" width="200">
+              <template #default="{ row }">
+                <span class="operation-name">{{ row.spanName }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="statusMessage" label="Error Message" min-width="300" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span class="error-message">{{ row.statusMessage }}</span>
+              </template>
+            </el-table-column>
             <el-table-column label="Time" width="180">
               <template #default="{ row }">
-                {{ formatDate(row.timestamp) }}
+                <span class="time-text">{{ timezoneStore.formatTime(row.timestamp) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="Actions" width="120" fixed="right">
@@ -153,107 +196,117 @@ const aggregatedErrors = computed(() => {
             @current-change="loadErrors"
             class="pagination"
           />
-        </div>
-      </el-tab-pane>
+        </el-tab-pane>
 
-      <el-tab-pane label="Aggregated" name="aggregated">
-        <div class="tab-content">
-          <el-table :data="aggregatedErrors" v-loading="loading" stripe>
-            <el-table-column prop="serviceName" label="Service" width="150" />
-            <el-table-column prop="message" label="Error Message" min-width="300" show-overflow-tooltip />
+        <el-tab-pane label="Aggregated" name="aggregated">
+          <el-table :data="aggregatedErrors" v-loading="loading">
+            <el-table-column prop="serviceName" label="Service" width="160">
+              <template #default="{ row }">
+                <el-tag size="small" effect="dark" type="info">{{ row.serviceName }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="message" label="Error Message" min-width="300" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span class="error-message">{{ row.message }}</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="count" label="Count" width="100" sortable>
               <template #default="{ row }">
-                <el-tag type="danger" size="small">{{ row.count }}</el-tag>
+                <span class="status-badge error">{{ row.count }}</span>
               </template>
             </el-table-column>
             <el-table-column label="Last Occurrence" width="180">
               <template #default="{ row }">
-                {{ formatDate(row.lastOccurrence) }}
+                <span class="time-text">{{ timezoneStore.formatTime(row.lastOccurrence) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="Actions" width="120" fixed="right">
               <template #default="{ row }">
-                <el-dropdown @command="(cmd: string) => cmd === 'view' && goToTrace(row.items[0].traceId)">
-                  <el-button size="small">
-                    Actions <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                  </el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item command="view">View Sample Trace</el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
+                <el-button type="primary" size="small" link @click="goToTrace(row.items[0].traceId)">
+                  View Sample
+                </el-button>
               </template>
             </el-table-column>
           </el-table>
-        </div>
-      </el-tab-pane>
+        </el-tab-pane>
 
-      <el-tab-pane label="Error Groups" name="groups">
-        <div class="tab-content">
-          <el-table :data="errorGroups" v-loading="loading" stripe>
-            <el-table-column prop="serviceName" label="Service" width="150" />
-            <el-table-column prop="message" label="Error Message" min-width="300" show-overflow-tooltip />
+        <el-tab-pane label="Error Groups" name="groups">
+          <el-table :data="errorGroups" v-loading="loading">
+            <el-table-column prop="serviceName" label="Service" width="160">
+              <template #default="{ row }">
+                <el-tag size="small" effect="dark" type="info">{{ row.serviceName }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="message" label="Error Message" min-width="300" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span class="error-message">{{ row.message }}</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="count" label="Count" width="100" sortable>
               <template #default="{ row }">
-                <el-tag type="danger" size="small">{{ row.count }}</el-tag>
+                <span class="status-badge error">{{ row.count }}</span>
               </template>
             </el-table-column>
             <el-table-column label="Last Occurrence" width="180">
               <template #default="{ row }">
-                {{ formatDate(row.lastOccurrence) }}
+                <span class="time-text">{{ timezoneStore.formatTime(row.lastOccurrence) }}</span>
               </template>
             </el-table-column>
           </el-table>
-        </div>
-      </el-tab-pane>
-    </el-tabs>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
   </div>
 </template>
 
-<script lang="ts">
-import { ArrowDown } from '@element-plus/icons-vue';
-import TimeSelector from '../components/TimeSelector.vue';
-import ServiceFilter from '../components/ServiceFilter.vue';
-
-export default {
-  components: {
-    ArrowDown,
-    TimeSelector,
-    ServiceFilter,
-  },
-};
-</script>
-
 <style scoped>
 .errors-page {
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.text-error {
+  color: var(--error);
 }
 
 .filters {
   display: flex;
   gap: 16px;
-}
-
-h2 {
-  margin: 0;
-}
-
-.tab-content {
-  min-height: 400px;
+  align-items: center;
+  padding: 12px 16px;
 }
 
 .pagination {
   margin-top: 16px;
   justify-content: flex-end;
+}
+
+.error-message {
+  color: var(--error);
+  font-size: 13px;
+}
+
+.time-text {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+:deep(.el-tabs__item) {
+  color: var(--text-secondary);
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: var(--accent);
+}
+
+:deep(.el-tabs__nav-wrap::after) {
+  background-color: var(--border);
 }
 </style>

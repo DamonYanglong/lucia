@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getTraceById, formatDuration, formatDate, buildSpanTree, flattenSpanTree, type SpanNode } from '../api';
+import { useTimezoneStore } from '../stores/timezone';
+import { getTraceById, formatDuration, buildSpanTree, flattenSpanTree, type SpanNode } from '../api';
+import { Loading, ArrowDown, ArrowRight } from '@element-plus/icons-vue';
 
 const route = useRoute();
 const router = useRouter();
+const timezoneStore = useTimezoneStore();
 
 const traceId = route.params.traceId as string;
 const trace = ref<any>(null);
@@ -12,6 +15,10 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const selectedSpan = ref<SpanNode | null>(null);
 const expandedSpans = ref<Set<string>>(new Set());
+
+// 大 trace 处理
+const MAX_DISPLAY_SPANS = 500;
+const showAllSpans = ref(false);
 
 onMounted(async () => {
   await loadTrace();
@@ -52,13 +59,21 @@ function selectSpan(span: SpanNode) {
   selectedSpan.value = span;
 }
 
+const isLargeTrace = computed(() => {
+  return (trace.value?.spans?.length || 0) > MAX_DISPLAY_SPANS;
+});
+
 const spanTree = computed(() => {
   if (!trace.value?.spans) return [];
   return buildSpanTree(trace.value.spans);
 });
 
 const flatSpans = computed(() => {
-  return flattenSpanTree(spanTree.value);
+  const all = flattenSpanTree(spanTree.value);
+  if (showAllSpans.value || all.length <= MAX_DISPLAY_SPANS) {
+    return all;
+  }
+  return all.slice(0, MAX_DISPLAY_SPANS);
 });
 
 const maxDuration = computed(() => {
@@ -73,17 +88,21 @@ function getWaterfallLeft(span: SpanNode): number {
   return (span.startTime / maxDuration.value) * 100;
 }
 
-function getStatusCodeColor(statusCode: string): string {
-  switch (statusCode) {
-    case 'Error': return 'danger';
-    case 'Ok': return 'success';
-    default: return 'info';
-  }
-}
-
 function getIndent(depth: number): number {
   return depth * 24;
 }
+
+// 计算统计数据
+const stats = computed(() => {
+  const spans = trace.value?.spans || [];
+  const errorCount = spans.filter((s: any) => s.statusCode === 'Error' || s.statusCode === 'STATUS_CODE_ERROR').length;
+
+  return {
+    spanCount: spans.length,
+    errorCount,
+    errorRate: spans.length > 0 ? ((errorCount / spans.length) * 100).toFixed(1) : '0',
+  };
+});
 </script>
 
 <template>
@@ -93,60 +112,104 @@ function getIndent(depth: number): number {
       <span>Loading trace...</span>
     </div>
 
-    <div v-else-if="error" class="error">
+    <div v-else-if="error" class="error-state">
       <el-alert type="error" :title="error" show-icon />
     </div>
 
     <div v-else-if="trace" class="trace-content">
       <!-- Trace Header -->
-      <div class="trace-header">
-        <el-page-header @back="router.back()">
-          <template #content>
-            <div class="trace-title">
-              <span>Trace: {{ traceId.slice(0, 8) }}</span>
-              <el-tag :type="getStatusCodeColor(trace.statusCode)" size="small">
-                {{ trace.statusCode }}
-              </el-tag>
-            </div>
-          </template>
-        </el-page-header>
+      <div class="trace-header card">
+        <div class="header-top">
+          <el-button @click="router.back()" text>
+            <el-icon><ArrowRight /></el-icon>
+            Back
+          </el-button>
+          <div class="trace-title">
+            <span class="trace-id">Trace: {{ traceId.slice(0, 16) }}...</span>
+            <span
+              class="status-badge"
+              :class="trace.statusCode === 'Error' || trace.statusCode === 'STATUS_CODE_ERROR' ? 'error' : 'success'"
+            >
+              {{ trace.statusCode === 'Error' || trace.statusCode === 'STATUS_CODE_ERROR' ? 'Error' : 'OK' }}
+            </span>
+          </div>
+        </div>
 
         <div class="trace-meta">
           <div class="meta-item">
-            <span class="label">Service:</span>
-            <span class="value">{{ trace.rootSpan.serviceName }}</span>
+            <span class="label">Service</span>
+            <span class="value">{{ trace.rootSpan?.serviceName || '-' }}</span>
           </div>
           <div class="meta-item">
-            <span class="label">Operation:</span>
-            <span class="value">{{ trace.rootSpan.spanName }}</span>
+            <span class="label">Operation</span>
+            <span class="value operation-name">{{ trace.rootSpan?.spanName || '-' }}</span>
           </div>
           <div class="meta-item">
-            <span class="label">Duration:</span>
-            <span class="value">{{ formatDuration(trace.duration) }}</span>
+            <span class="label">Duration</span>
+            <span class="value duration">{{ formatDuration(trace.duration) }}</span>
           </div>
           <div class="meta-item">
-            <span class="label">Spans:</span>
-            <span class="value">{{ trace.spanCount }}</span>
+            <span class="label">Spans</span>
+            <span class="value">{{ stats.spanCount }}</span>
           </div>
           <div class="meta-item">
-            <span class="label">Time:</span>
-            <span class="value">{{ formatDate(trace.rootSpan.timestamp) }}</span>
+            <span class="label">Errors</span>
+            <span class="value" :class="{ 'text-error': stats.errorCount > 0 }">{{ stats.errorCount }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="label">Time</span>
+            <span class="value time-text">{{ trace.rootSpan?.timestamp ? timezoneStore.formatTime(trace.rootSpan.timestamp) : '-' }}</span>
           </div>
         </div>
       </div>
 
+      <!-- 统计卡片 -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">{{ formatDuration(trace.duration) }}</div>
+          <div class="stat-label">Total Duration</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{{ stats.spanCount }}</div>
+          <div class="stat-label">Total Spans</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" :class="{ 'text-error': stats.errorCount > 0 }">{{ stats.errorCount }}</div>
+          <div class="stat-label">Error Spans</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{{ stats.errorRate }}%</div>
+          <div class="stat-label">Error Rate</div>
+        </div>
+      </div>
+
+      <!-- Large trace warning -->
+      <el-alert
+        v-if="isLargeTrace && !showAllSpans"
+        type="warning"
+        :closable="false"
+        class="warning-alert"
+      >
+        <template #title>
+          此 Trace 包含 {{ trace.spanCount?.toLocaleString() }} 个 spans，为避免页面卡顿，当前只显示前 {{ MAX_DISPLAY_SPANS }} 条。
+        </template>
+        <el-button size="small" type="primary" @click="showAllSpans = true" style="margin-left: 12px">
+          加载全部
+        </el-button>
+      </el-alert>
+
       <!-- Spans Table -->
-      <div class="spans-section">
-        <h3>Spans ({{ trace.spans.length }})</h3>
+      <div class="spans-section card">
+        <h3>Spans ({{ showAllSpans || !isLargeTrace ? trace.spans?.length : flatSpans.length }})</h3>
 
         <el-table
           :data="flatSpans"
-          stripe
           highlight-current-row
           @row-click="(row: SpanNode) => selectSpan(row)"
           class="spans-table"
+          max-height="500"
         >
-          <el-table-column label="Name" min-width="300">
+          <el-table-column label="Name" min-width="320">
             <template #default="{ row }">
               <div
                 class="span-name-cell"
@@ -166,22 +229,25 @@ function getIndent(depth: number): number {
                 </span>
                 <span v-else class="expand-placeholder"></span>
                 <span class="span-name">{{ row.spanName }}</span>
-                <el-tag size="small" class="service-tag">{{ row.serviceName }}</el-tag>
+                <el-tag size="small" class="service-tag" effect="dark" type="info">{{ row.serviceName }}</el-tag>
               </div>
             </template>
           </el-table-column>
 
           <el-table-column label="Duration" width="120">
             <template #default="{ row }">
-              {{ formatDuration(row.duration) }}
+              <span class="duration">{{ formatDuration(row.duration) }}</span>
             </template>
           </el-table-column>
 
           <el-table-column label="Status" width="100">
             <template #default="{ row }">
-              <el-tag :type="getStatusCodeColor(row.statusCode)" size="small">
-                {{ row.statusCode }}
-              </el-tag>
+              <span
+                class="status-badge"
+                :class="row.statusCode === 'Error' || row.statusCode === 'STATUS_CODE_ERROR' ? 'error' : 'success'"
+              >
+                {{ row.statusCode === 'Error' || row.statusCode === 'STATUS_CODE_ERROR' ? 'Error' : 'OK' }}
+              </span>
             </template>
           </el-table-column>
 
@@ -194,7 +260,7 @@ function getIndent(depth: number): number {
                     width: `${getWaterfallWidth(row)}%`,
                     marginLeft: `${getWaterfallLeft(row)}%`,
                   }"
-                  :class="`status-${row.statusCode.toLowerCase()}`"
+                  :class="row.statusCode === 'Error' || row.statusCode === 'STATUS_CODE_ERROR' ? 'status-error' : 'status-ok'"
                 />
               </div>
             </template>
@@ -203,29 +269,48 @@ function getIndent(depth: number): number {
       </div>
 
       <!-- Span Details -->
-      <div v-if="selectedSpan" class="span-details">
+      <div v-if="selectedSpan" class="span-details card">
         <h3>Span Details</h3>
 
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="Span Name">{{ selectedSpan.spanName }}</el-descriptions-item>
-          <el-descriptions-item label="Service">{{ selectedSpan.serviceName }}</el-descriptions-item>
-          <el-descriptions-item label="Span ID">{{ selectedSpan.spanId }}</el-descriptions-item>
-          <el-descriptions-item label="Parent Span ID">
-            {{ selectedSpan.parentSpanId || '(root)' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Duration">{{ formatDuration(selectedSpan.duration) }}</el-descriptions-item>
-          <el-descriptions-item label="Status">
-            <el-tag :type="getStatusCodeColor(selectedSpan.statusCode)" size="small">
+        <div class="details-grid">
+          <div class="detail-item">
+            <span class="label">Span Name</span>
+            <span class="value">{{ selectedSpan.spanName }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Service</span>
+            <span class="value">{{ selectedSpan.serviceName }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Span ID</span>
+            <span class="value mono">{{ selectedSpan.spanId }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Parent Span ID</span>
+            <span class="value mono">{{ selectedSpan.parentSpanId || '(root)' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Duration</span>
+            <span class="value">{{ formatDuration(selectedSpan.duration) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Status</span>
+            <span
+              class="status-badge"
+              :class="selectedSpan.statusCode === 'Error' || selectedSpan.statusCode === 'STATUS_CODE_ERROR' ? 'error' : 'success'"
+            >
               {{ selectedSpan.statusCode }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="Status Message" :span="2">
-            {{ selectedSpan.statusMessage || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Timestamp" :span="2">
-            {{ formatDate(selectedSpan.timestamp) }}
-          </el-descriptions-item>
-        </el-descriptions>
+            </span>
+          </div>
+          <div class="detail-item full-width">
+            <span class="label">Status Message</span>
+            <span class="value">{{ selectedSpan.statusMessage || '-' }}</span>
+          </div>
+          <div class="detail-item full-width">
+            <span class="label">Timestamp</span>
+            <span class="value">{{ timezoneStore.formatTime(selectedSpan.timestamp) }}</span>
+          </div>
+        </div>
 
         <!-- Attributes -->
         <div v-if="selectedSpan.spanAttributes && Object.keys(selectedSpan.spanAttributes).length > 0" class="attributes-section">
@@ -248,43 +333,28 @@ function getIndent(depth: number): number {
         <!-- Events -->
         <div v-if="selectedSpan.events && selectedSpan.events.length > 0" class="events-section">
           <h4>Events ({{ selectedSpan.events.length }})</h4>
-          <el-timeline>
-            <el-timeline-item
-              v-for="(event, idx) in selectedSpan.events"
-              :key="idx"
-              :timestamp="formatDate(event.timestamp)"
-            >
-              <strong>{{ event.name }}</strong>
+          <div class="events-list">
+            <div v-for="(event, idx) in selectedSpan.events" :key="idx" class="event-item">
+              <div class="event-time">{{ timezoneStore.formatTime(event.timestamp) }}</div>
+              <div class="event-name">{{ event.name }}</div>
               <div v-if="Object.keys(event.attributes).length > 0" class="event-attributes">
                 <span v-for="(v, k) in event.attributes" :key="k" class="event-attr">
                   {{ k }}: {{ v }}
                 </span>
               </div>
-            </el-timeline-item>
-          </el-timeline>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </template>
 
-<script lang="ts">
-import { Loading, ArrowDown, ArrowRight } from '@element-plus/icons-vue';
-
-export default {
-  components: {
-    Loading,
-    ArrowDown,
-    ArrowRight,
-  },
-};
-</script>
-
 <style scoped>
 .trace-detail-page {
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .loading {
@@ -292,59 +362,82 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 40px;
-  color: #909399;
+  padding: 60px;
+  color: var(--text-secondary);
 }
 
-.error {
-  padding: 20px 0;
+.error-state {
+  padding: 20px;
 }
 
 .trace-header {
-  margin-bottom: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #ebeef5;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .trace-title {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 18px;
+}
+
+.trace-id {
+  font-size: 16px;
   font-weight: 500;
+  color: var(--text-primary);
+  font-family: 'SF Mono', Monaco, monospace;
 }
 
 .trace-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 24px;
-  margin-top: 16px;
 }
 
 .meta-item {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .meta-item .label {
-  color: #909399;
-  font-size: 14px;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .meta-item .value {
-  color: #303133;
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 500;
 }
 
-.spans-section {
-  margin-bottom: 24px;
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
 }
 
-.spans-section h3 {
+.text-error {
+  color: var(--error);
+}
+
+.warning-alert {
+  margin-bottom: 0;
+}
+
+.spans-section h3,
+.span-details h3 {
   margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: 500;
+  color: var(--text-primary);
 }
 
 .spans-table {
@@ -361,12 +454,12 @@ export default {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  color: #909399;
+  color: var(--text-muted);
   width: 16px;
 }
 
 .expand-icon:hover {
-  color: #409eff;
+  color: var(--accent);
 }
 
 .expand-placeholder {
@@ -376,17 +469,18 @@ export default {
 
 .span-name {
   flex: 1;
+  color: var(--text-primary);
 }
 
 .service-tag {
   margin-left: 8px;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .waterfall-container {
   position: relative;
   height: 20px;
-  background: #f5f7fa;
+  background: var(--bg-tertiary);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -399,32 +493,53 @@ export default {
 }
 
 .waterfall-bar.status-ok {
-  background: #67c23a;
+  background: var(--success);
 }
 
 .waterfall-bar.status-error {
-  background: #f56c6c;
-}
-
-.waterfall-bar.status-unset {
-  background: #909399;
+  background: var(--error);
 }
 
 .span-details {
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid #ebeef5;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.span-details h3 {
-  margin: 0 0 16px 0;
-  font-size: 16px;
-  font-weight: 500;
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-item.full-width {
+  grid-column: span 2;
+}
+
+.detail-item .label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.detail-item .value {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.detail-item .value.mono {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 12px;
 }
 
 .attributes-section,
 .events-section {
-  margin-top: 20px;
+  margin-top: 8px;
 }
 
 .attributes-section h4,
@@ -432,21 +547,52 @@ export default {
   margin: 0 0 12px 0;
   font-size: 14px;
   font-weight: 500;
-  color: #606266;
+  color: var(--text-secondary);
+}
+
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.event-item {
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+.event-time {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.event-name {
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 .event-attributes {
   margin-top: 8px;
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
 }
 
 .event-attr {
   font-size: 12px;
-  color: #606266;
-  background: #f5f7fa;
-  padding: 2px 8px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  padding: 4px 8px;
   border-radius: 4px;
+}
+
+:deep(.el-table__row) {
+  cursor: pointer;
+}
+
+:deep(.el-table__row:hover > td) {
+  background: var(--bg-tertiary) !important;
 }
 </style>

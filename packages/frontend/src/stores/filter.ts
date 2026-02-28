@@ -3,9 +3,14 @@ import { ref, computed } from 'vue';
 
 export const useFilterStore = defineStore('filter', () => {
   const service = ref('');
-  const timeRange = ref('1h');
+  const timeRange = ref('24h');
   const customStartTime = ref<Date | null>(null);
   const customEndTime = ref<Date | null>(null);
+
+  function formatDateTime(date: Date): string {
+    // Format: YYYY-MM-DD HH:MM:SS (ClickHouse compatible)
+    return date.toISOString().replace('T', ' ').substring(0, 19);
+  }
 
   const startTime = computed(() => {
     const end = customEndTime.value || new Date();
@@ -22,14 +27,14 @@ export const useFilterStore = defineStore('filter', () => {
         start.setTime(end.getTime() - 24 * 60 * 60 * 1000);
         break;
       case 'custom':
-        return customStartTime.value?.toISOString() || start.toISOString();
+        return formatDateTime(customStartTime.value || start);
     }
     
-    return start.toISOString();
+    return formatDateTime(start);
   });
 
   const endTime = computed(() => {
-    return (customEndTime.value || new Date()).toISOString();
+    return formatDateTime(customEndTime.value || new Date());
   });
 
   function setService(s: string) {

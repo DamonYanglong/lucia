@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory } from 'vue-router'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -10,29 +10,34 @@ const router = createRouter({
     {
       path: '/services',
       name: 'Services',
-      component: () => import('@/views/Services.vue'),
+      component: () => import('../views/Services.vue'),
+      meta: { title: 'Services' },
     },
     {
       path: '/traces',
       name: 'Traces',
-      component: () => import('@/views/Traces.vue'),
+      component: () => import('../views/Traces.vue'),
+      meta: { title: 'Traces' },
     },
     {
       path: '/traces/:traceId',
       name: 'TraceDetail',
-      component: () => import('@/views/TraceDetail.vue'),
+      component: () => import('../views/TraceDetail.vue'),
+      meta: { title: 'Trace Detail' },
     },
     {
       path: '/errors',
       name: 'Errors',
-      component: () => import('@/views/Errors.vue'),
+      component: () => import('../views/Errors.vue'),
+      meta: { title: 'Errors' },
     },
     {
       path: '/slow',
       name: 'SlowCalls',
-      component: () => import('@/views/SlowCalls.vue'),
+      component: () => import('../views/SlowCalls.vue'),
+      meta: { title: 'Slow Calls' },
     },
   ],
-});
+})
 
-export default router;
+export default router

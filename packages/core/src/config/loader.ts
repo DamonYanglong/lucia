@@ -7,6 +7,7 @@ export interface Config {
     port: number;
     host: string;
   };
+  timezone: string;
   store: {
     trace?: {
       plugin: string;
@@ -28,6 +29,7 @@ const defaultConfig: Config = {
     port: 3000,
     host: '0.0.0.0',
   },
+  timezone: 'UTC',
   store: {},
 };
 
@@ -65,6 +67,7 @@ export async function loadConfig(): Promise<Config> {
       port: envNumber('LUCIA_PORT', fileConfig.server?.port || defaultConfig.server.port),
       host: envOrDefault('LUCIA_HOST', fileConfig.server?.host || defaultConfig.server.host),
     },
+    timezone: envOrDefault('TIMEZONE', fileConfig.timezone || defaultConfig.timezone),
     store: {
       ...fileConfig.store,
       trace: fileConfig.store?.trace ? {

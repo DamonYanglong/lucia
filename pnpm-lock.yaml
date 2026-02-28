@@ -41,7 +41,13 @@ importers:
       yaml:
         specifier: ^2.0.0
         version: 2.8.2
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
     devDependencies:
+      '@clickhouse/client':
+        specifier: ^1.0.0
+        version: 1.17.0
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.13
@@ -2188,6 +2194,9 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
 snapshots:
 
   '@asamuzakjp/css-color@3.2.0':
@@ -4049,3 +4058,5 @@ snapshots:
   yaml@2.8.2: {}
 
   yocto-queue@0.1.0: {}
+
+  zod@3.25.76: {}

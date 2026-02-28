@@ -1,19 +1,40 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useFilterStore } from '../stores/filter';
+import { useTimezoneStore } from '../stores/timezone';
 import type { SlowCall } from '../api';
-import { formatDuration, formatDate } from '../api';
+import { formatDuration } from '../api';
 import TimeSelector from '../components/TimeSelector.vue';
 import ServiceFilter from '../components/ServiceFilter.vue';
 
 const router = useRouter();
 const filterStore = useFilterStore();
+const timezoneStore = useTimezoneStore();
 
 const slowCalls = ref<SlowCall[]>([]);
 const services = ref<string[]>([]);
 const loading = ref(false);
 const limit = ref(100);
+
+// 计算统计数据
+const stats = computed(() => {
+  const total = slowCalls.value.length;
+  const slowestDuration = total > 0 ? slowCalls.value[0].duration : 0;
+  const avgDuration = total > 0
+    ? slowCalls.value.reduce((sum, c) => sum + c.duration, 0) / total
+    : 0;
+  const p99Duration = total > 0
+    ? slowCalls.value[Math.min(Math.floor(total * 0.99), total - 1)].duration
+    : 0;
+
+  return {
+    total,
+    slowestDuration,
+    avgDuration,
+    p99Duration,
+  };
+});
 
 onMounted(async () => {
   await loadServices();
@@ -60,12 +81,11 @@ function goToTrace(traceId: string) {
   router.push(`/traces/${traceId}`);
 }
 
-function getDurationColor(duration: number): string {
-  // Duration is in nanoseconds
+function getDurationClass(duration: number): string {
   const ms = duration / 1000000;
-  if (ms > 5000) return 'danger';
-  if (ms > 1000) return 'warning';
-  return 'success';
+  if (ms > 5000) return 'slow';
+  if (ms > 1000) return 'medium';
+  return 'fast';
 }
 
 const limitOptions = [
@@ -78,134 +98,126 @@ const limitOptions = [
 
 <template>
   <div class="slow-calls-page">
-    <div class="header">
-      <h2>Slow Calls</h2>
-      <div class="filters">
-        <TimeSelector />
-        <ServiceFilter :services="services" />
-        <el-select v-model="limit" placeholder="Limit" style="width: 120px">
-          <el-option
-            v-for="opt in limitOptions"
-            :key="opt.value"
-            :label="opt.label"
-            :value="opt.value"
-          />
-        </el-select>
-      </div>
-    </div>
-
-    <div class="stats">
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-value">{{ slowCalls.length }}</div>
+        <div class="stat-value">{{ stats.total }}</div>
         <div class="stat-label">Total Slow Calls</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">
-          {{ slowCalls.length > 0 ? formatDuration(slowCalls[0].duration) : '-' }}
-        </div>
+        <div class="stat-value text-error">{{ formatDuration(stats.slowestDuration) }}</div>
         <div class="stat-label">Slowest Call</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">
-          {{
-            slowCalls.length > 0
-              ? formatDuration(slowCalls.reduce((sum, c) => sum + c.duration, 0) / slowCalls.length)
-              : '-'
-          }}
-        </div>
+        <div class="stat-value text-warning">{{ formatDuration(stats.avgDuration) }}</div>
         <div class="stat-label">Average Duration</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ formatDuration(stats.p99Duration) }}</div>
+        <div class="stat-label">P99 Duration</div>
       </div>
     </div>
 
-    <el-table
-      :data="slowCalls"
-      v-loading="loading"
-      stripe
-      default-sort="{ prop: 'duration', order: 'descending' }"
-    >
-      <el-table-column prop="serviceName" label="Service" width="150" />
-      <el-table-column prop="spanName" label="Operation" min-width="200" />
-      <el-table-column label="Duration" width="150" sortable="custom">
-        <template #default="{ row }">
-          <el-tag :type="getDurationColor(row.duration)" size="small">
-            {{ formatDuration(row.duration) }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="Time" width="180">
-        <template #default="{ row }">
-          {{ formatDate(row.timestamp) }}
-        </template>
-      </el-table-column>
-      <el-table-column label="Trace ID" width="100">
-        <template #default="{ row }">
-          <span class="trace-id">{{ row.traceId.slice(0, 8) }}...</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="Actions" width="120" fixed="right">
-        <template #default="{ row }">
-          <el-button type="primary" size="small" link @click="goToTrace(row.traceId)">
-            View Trace
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <!-- 过滤器 -->
+    <div class="filters card">
+      <TimeSelector />
+      <ServiceFilter :services="services" />
+      <el-select v-model="limit" placeholder="Limit" style="width: 120px">
+        <el-option
+          v-for="opt in limitOptions"
+          :key="opt.value"
+          :label="opt.label"
+          :value="opt.value"
+        />
+      </el-select>
+    </div>
 
-    <el-empty v-if="!loading && slowCalls.length === 0" description="No slow calls found" />
+    <!-- 慢调用列表 -->
+    <div class="card">
+      <el-table
+        :data="slowCalls"
+        v-loading="loading"
+        default-sort="{ prop: 'duration', order: 'descending' }"
+        @row-click="(row: SlowCall) => goToTrace(row.traceId)"
+      >
+        <el-table-column prop="serviceName" label="Service" width="160">
+          <template #default="{ row }">
+            <el-tag size="small" effect="dark" type="info">{{ row.serviceName }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="spanName" label="Operation" min-width="240">
+          <template #default="{ row }">
+            <span class="operation-name">{{ row.spanName }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="Duration" width="140" sortable="custom">
+          <template #default="{ row }">
+            <span class="duration" :class="getDurationClass(row.duration)">
+              {{ formatDuration(row.duration) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="Time" width="180">
+          <template #default="{ row }">
+            <span class="time-text">{{ timezoneStore.formatTime(row.timestamp) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="Trace ID" width="120">
+          <template #default="{ row }">
+            <span class="trace-id">{{ row.traceId.slice(0, 8) }}...</span>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <el-empty v-if="!loading && slowCalls.length === 0" description="No slow calls found" />
+    </div>
   </div>
 </template>
 
 <style scoped>
 .slow-calls-page {
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.text-error {
+  color: var(--error);
+}
+
+.text-warning {
+  color: var(--warning);
 }
 
 .filters {
   display: flex;
   gap: 16px;
-}
-
-h2 {
-  margin: 0;
-}
-
-.stats {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  flex: 1;
-  padding: 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 8px;
-  color: #fff;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 4px;
-}
-
-.stat-label {
-  font-size: 14px;
-  opacity: 0.9;
+  align-items: center;
+  padding: 12px 16px;
 }
 
 .trace-id {
-  font-family: monospace;
+  font-family: 'SF Mono', Monaco, monospace;
   font-size: 12px;
-  color: #909399;
+  color: var(--text-muted);
+}
+
+.time-text {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+:deep(.el-table__row) {
+  cursor: pointer;
+}
+
+:deep(.el-table__row:hover > td) {
+  background: var(--bg-tertiary) !important;
 }
 </style>

@@ -4,6 +4,7 @@ import staticPlugin from '@fastify/static';
 import { loadConfig } from './config/loader';
 import { loadPlugins } from './store/plugin-loader';
 import type { StorePlugins } from './store/interface';
+import { errorHandler } from './middleware/errorHandler';
 
 const fastify = Fastify({
   logger: {
@@ -16,6 +17,9 @@ const fastify = Fastify({
     },
   },
 });
+
+// Register global error handler
+fastify.setErrorHandler(errorHandler);
 
 let storePlugins: StorePlugins = {};
 
@@ -31,8 +35,15 @@ async function main() {
   }
   
   // Register CORS
+  const corsOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+    : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+
   await fastify.register(cors, {
-    origin: true,
+    origin: corsOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
   
   // Register API routes
@@ -40,6 +51,7 @@ async function main() {
   await fastify.register(import('./routes/services'), { prefix: '/api' });
   await fastify.register(import('./routes/errors'), { prefix: '/api' });
   await fastify.register(import('./routes/slow'), { prefix: '/api' });
+  await fastify.register(import('./routes/settings'), { prefix: '/api' });
   
   // Health check
   fastify.get('/health', async () => ({ status: 'ok' }));

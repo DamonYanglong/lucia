@@ -42,7 +42,7 @@ export interface Span {
   spanKind: string;
   serviceName: string;
   duration: number;
-  statusCode: 'Unset' | 'Ok' | 'Error';
+  statusCode: string;  // Can be 'Unset', 'Ok', 'Error', 'STATUS_CODE_ERROR', etc.
   statusMessage: string;
   spanAttributes: Record<string, string>;
   resourceAttributes: Record<string, string>;
