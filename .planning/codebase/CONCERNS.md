@@ -4,135 +4,152 @@
 
 ## Tech Debt
 
-**Type Safety with 'any' and 'unknown':**
-- Issue: Heavy use of `any` type throughout the codebase, particularly in the ClickHouse plugin
-- Files:
-  - `packages/plugins/store-trace-clickhouse/src/index.ts`
-  - `packages/frontend/src/views/TraceDetail.vue`
-  - `packages/frontend/src/views/Traces.vue`
-  - `packages/frontend/src/views/Errors.vue`
-  - `packages/frontend/src/views/SlowCalls.vue`
-  - `packages/core/src/store/plugin-loader.ts`
-- Impact: Type safety is compromised, making the code prone to runtime errors
-- Fix approach: Define proper interfaces for all data structures and use stricter typing
+### Weak Type Safety
+**Issue:** Heavy use of `any` type throughout the codebase reduces type safety
+- Files: `packages/core/src/store/plugin-loader.ts`, `packages/plugins/store-trace-clickhouse/src/index.ts`
+- Impact: Type checking bypassed, potential runtime errors
+- Fix approach: Define specific interfaces for ClickHouse query responses, replace `any` with proper types
 
-**Large Component Files:**
-- Issue: `TraceDetail.vue` (604 lines) violates the file size guideline
-- Files: `packages/frontend/src/views/TraceDetail.vue`
-- Impact: Hard to maintain, test, and review
-- Fix approach: Break into smaller components (TraceSpans.vue, TraceWaterfall.vue, etc.)
+### Inconsistent Error Handling
+**Issue:** Limited try-catch blocks, no comprehensive error handling
+- Files: `packages/core/src/routes/traces.ts`, `packages/plugins/store-trace-clickhouse/src/index.ts`
+- Impact: Database connection failures not handled gracefully
+- Fix approach: Add proper error handling for all database operations, implement circuit breakers for ClickHouse
 
-**Console.log in Production Code:**
-- Issue: Debug statement in main application entry point
-- Files: `packages/core/src/app.ts`
-- Impact: Not following production code standards
-- Fix approach: Replace with proper logging framework calls
-
-## Known Bugs
-
-**Trace Data Processing:**
-- Issue: Potential null reference when processing trace spans
-- Files: `packages/frontend/src/views/TraceDetail.vue` (line 42: `console.error(e)`)
-- Symptoms: Error might not be properly handled or displayed
-- Workaround: Try refreshing the page
-
-**Date Timezone Handling:**
-- Issue: Manual timestamp conversion in ClickHouse plugin may not handle all edge cases
-- Files: `packages/plugins/store-trace-clickhouse/src/index.ts` (lines 56-64)
-- Symptoms: Incorrect timestamps in some timezones
-- Workaround: Ensure all data is in UTC
+### Console Logging in Production
+**Issue:** `console.log` statement in app startup
+- Files: `packages/core/src/app.ts` line 57
+- Impact: Dev-specific code in production
+- Fix approach: Replace with proper logger or conditional logging
 
 ## Security Considerations
 
-**Database Connection Security:**
-- Risk: ClickHouse connection credentials handled in config files
-- Files: `packages/core/src/config/loader.ts` (lines 74-78)
+### Hardcoded Configuration
+**Issue:** Default ClickHouse credentials in config loader
+- Files: `packages/core/src/config/loader.ts` lines 74-78
+- Risk: Potential security exposure if defaults are used in production
 - Current mitigation: Environment variable override available
-- Recommendations: Add connection encryption and credential rotation
+- Recommendations: Enforce secure defaults, require configuration in production
 
-**CORS Configuration:**
-- Risk: Open CORS configuration (`origin: true`)
-- Files: `packages/core/src/app.ts` (lines 34-36)
-- Current mitigation: Limited by server host configuration
-- Recommendations: Restrict to specific domains in production
+### No Input Validation
+**Issue:** Route parameters not validated before processing
+- Files: `packages/core/src/routes/traces.ts`
+- Risk: SQL injection potential through query parameters
+- Recommendations: Add input validation using Zod or similar
+
+### CORS Configuration
+**Issue:** CORS allows all origins (`origin: true`)
+- Files: `packages/core/src/app.ts` line 35
+- Risk: Cross-origin attacks
+- Recommendations: Configure specific allowed origins in production
 
 ## Performance Bottlenecks
 
-**Large Trace Rendering:**
-- Problem: UI performance issues when displaying traces with >500 spans
-- Files: `packages/frontend/src/views/TraceDetail.vue`
-- Cause: DOM manipulation for each span, no virtualization
-- Improvement path: Implement virtual scrolling for span lists
+### Large Trace Processing
+**Issue:** Frontend limits trace display to 500 spans
+- Files: `packages/frontend/src/views/TraceDetail.vue` line 18
+- Problem: Performance degrades with large traces
+- Cause: No virtual scrolling, DOM manipulation
+- Improvement path: Implement virtual scrolling for span list
 
-**Multiple Database Queries:**
-- Problem: Separate queries for count and data in ClickHouse plugin
+### SQL Query Optimization
+**Issue:** Multiple queries for trace data (count + data)
 - Files: `packages/plugins/store-trace-clickhouse/src/index.ts`
-- Cause: Inefficient pagination implementation
-- Improvement path: Use ClickHouse LIMIT and OFFSET with optimized queries
+- Problem: Database round trips for pagination
+- Cause: ClickHouse doesn't support LIMIT with total count
+- Improvement path: Use ClickHouse `LIMIT` with `SETTINGS` for better performance
+
+### No Connection Pooling
+**Issue:** ClickHouse client created per request
+- Files: `packages/plugins/store-trace-clickhouse/src/index.ts` line 37
+- Problem: Connection overhead
+- Cause: Single instance reused but no pooling configuration
+- Improvement path: Configure connection pool settings
 
 ## Fragile Areas
 
-**Plugin Loading System:**
-- Files: `packages/core/src/store/plugin-loader.ts`
-- Why fragile: No plugin validation, assumes proper interface implementation
-- Safe modification: Add plugin interface validation before loading
-- Test coverage: Limited test coverage for plugin error scenarios
+### Hardcoded Table Names
+**Issue: Database table names hardcoded throughout
+- Files: `packages/plugins/store-trace-clickhouse/src/index.ts`
+- Why fragile: Schema changes require code updates
+- Safe modification: Extract to constants or configuration
+- Test coverage: Missing integration tests for schema changes
 
-**Configuration Loading:**
-- Files: `packages/core/src/config/loader.ts`
-- Why fragile: Multiple config paths with fallback logic could lead to confusion
-- Safe modification: Add config validation schema
-- Test coverage: Missing tests for config edge cases
+### Plugin Loading
+**Issue: Plugin loading relies on dynamic imports with fallback logic
+- Files: `packages/core/src/store/plugin-loader.ts`
+- Why fragile: External plugin naming convention not enforced
+- Safe modification: Add plugin validation before initialization
+- Test coverage: Limited test scenarios for external plugins
+
+### Date Time Handling
+**Issue: Multiple date format conversions
+- Files: `packages/plugins/store-trace-clickhouse/src/index.ts`, `packages/frontend/src/stores/filter.ts`
+- Why fragile: ClickHouse format vs ISO format mixing
+- Safe modification: Centralize date conversion utilities
+- Test coverage: Missing time zone edge case tests
 
 ## Scaling Limits
 
-**ClickHouse Query Performance:**
-- Current capacity: Single table queries, no indexing mentioned
-- Limit: Performance degradation with large datasets
-- Scaling path: Add proper indexing, query optimization, and connection pooling
+### Single ClickHouse Instance
+**Issue: No database sharding or replication
+- Current capacity: Limited by single ClickHouse node
+- Limit: Storage and query performance bottleneck
+- Scaling path: Implement ClickHouse cluster support
 
-**Memory Usage:**
-- Current capacity: Loading full trace data into memory
-- Limit: Browser memory limits for large traces
-- Scaling path: Implement streaming and pagination for large datasets
+### No Caching Layer
+**Issue: No caching for frequent queries
+- Current capacity: Direct database queries for all requests
+- Limit: Database connection limits, query performance
+- Scaling path: Add Redis caching for popular queries
 
 ## Dependencies at Risk
 
-**Element Plus UI Library:**
-- Risk: Heavy dependency with potential breaking changes
-- Impact: Multiple Vue components would need updating
-- Migration plan: Consider more lightweight or custom components
+### ClickHouse Client
+**Risk:** `@clickhouse/client` is new library
+- Impact: Breaking changes possible
+- Migration plan: Monitor for updates, implement test suite
+
+### Vue 3 Composition API
+**Risk:** New framework patterns
+- Impact: Migration complexity
+- Migration plan: Follow Vue 3 best practices, avoid deprecated patterns
 
 ## Missing Critical Features
 
-**Input Validation:**
-- Problem: No client-side validation for API requests
-- Blocks: Poor user experience and unnecessary server errors
-- Recommended: Add form validation before API calls
+### Authentication/Authorization
+**Problem:** No security layer for API access
+- Blocks: Production deployment with sensitive data
+- Priority: High
 
-**Error Boundary:**
-- Problem: No error boundary in Vue components
-- Blocks: Component errors crash entire view
-- Recommended: Add error boundary components
+### Rate Limiting
+**Problem:** No protection against abuse
+- Blocks: Public deployment
+- Priority: Medium
+
+### Monitoring/Metrics
+**Problem:** No self-monitoring
+- Blocks: Performance troubleshooting
+- Priority: Medium
 
 ## Test Coverage Gaps
 
-**Frontend Component Testing:**
-- What's not tested: Component interactions and UI behavior
-- Files: `packages/frontend/src/views/*.vue`
-- Risk: UI changes could break functionality unnoticed
+### Integration Tests Missing
+**What's not tested:** API endpoints with database
+- Files: `packages/core/src/routes/*`
+- Risk: Breaking changes undetected
 - Priority: High
 
-**Plugin System Testing:**
-- What's not tested: Plugin loading failures and error handling
-- Files: `packages/core/src/store/plugin-loader.ts`
-- Risk: Plugin crashes could bring down entire application
+### Error Scenarios
+**What's not tested:** Database connection failures, timeouts
+- Files: `packages/plugins/store-trace-clickhouse/src/index.ts`
+- Risk: Runtime errors in production
 - Priority: High
 
-**Integration Testing:**
-- What's not tested: End-to-end flows between frontend and backend
-- Files: Multiple across packages
-- Risk: Integration points might have mismatches
+### Frontend Error Handling
+**What's not tested:** API failure scenarios
+- Files: `packages/frontend/src/views/*`
+- Risk: Poor user experience on failures
 - Priority: Medium
 
 ---

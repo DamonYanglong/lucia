@@ -4,97 +4,87 @@
 
 ## APIs & External Services
 
-**ClickHouse:**
-- Service: Time-series database for trace storage
-  - SDK/Client: `@clickhouse/client` ^1.0.0
-  - Tables: `open_telemetry_traces`, `open_telemetry_traces_trace_id_ts`
-  - Connection: HTTPS with basic auth
-  - Query pattern: SQL with parameterized queries
-  - Used for: Trace storage, metrics, error tracking
+**Database:**
+- ClickHouse - Primary storage for OpenTelemetry traces
+  - SDK/Client: @clickhouse/client
+  - Connection: HTTP interface (port 8123 default)
+  - Auth: Username/password credentials
 
-**OpenTelemetry:**
-- Service: Observability protocol standard
-  - Integration: ClickHouse plugin ingests OpenTelemetry traces
-  - Data format: Spans with attributes, timestamps, service names
-  - Used for: Trace data ingestion
+**Internal APIs:**
+- Fastify REST API - Backend services
+  - Endpoints: /api/traces, /api/services, /api/errors, /api/slow
+  - CORS enabled for frontend access
+  - Health check: /health
 
 ## Data Storage
 
-**Primary Database:**
-- ClickHouse - Time-series database
-  - Connection: Environment variables
-    - `CLICKHOUSE_HOST` (default: localhost)
-    - `CLICKHOUSE_PORT` (default: 9000)
-    - `CLICKHOUSE_DATABASE` (default: default)
-    - `CLICKHOUSE_USERNAME` (default: default)
-    - `CLICKHOUSE_PASSWORD` (default: '')
-  - Tables:
-    - `open_telemetry_traces` - Main trace data
-    - `open_telemetry_traces_trace_id_ts` - Trace ID time index
+**Databases:**
+- ClickHouse
+  - Connection: CLICKHOUSE_HOST, CLICKHOUSE_PORT, CLICKHOUSE_DATABASE, CLICKHOUSE_USERNAME, CLICKHOUSE_PASSWORD
+  - Client: Direct ClickHouse client with parameterized queries
+  - Tables: open_telemetry_traces (main), open_telemetry_traces_trace_id_ts (auxiliary)
 
 **File Storage:**
-- Local filesystem only
-  - Static assets: `packages/frontend/dist` (served by Fastify in production)
+- Local filesystem only (static files)
 
 **Caching:**
-- None detected
+- None detected in current implementation
 
 ## Authentication & Identity
 
-**Current:** None detected
-- API endpoints are unauthenticated
-- CORS configured for all origins (`origin: true`)
-
-**Potential future integrations:**
-- JWT authentication for API endpoints
-- Rate limiting middleware
+**Auth Provider:**
+- None detected (public API access)
+- No authentication middleware configured
 
 ## Monitoring & Observability
 
-**Logging:**
-- pino ^9.0.0 - Structured logging
-  - Transport: pino-pretty for development
-  - Levels: Configurable via `LOG_LEVEL` env var
-
-**Metrics:**
-- ClickHouse provides built-in metrics (count, averages, error rates)
-
 **Error Tracking:**
-- ClickHouse stores error traces
-  - Query by `StatusCode = 'Error'`
-  - Error grouping by message and service
+- None detected (Pino logging configured but no external error tracking)
+
+**Logs:**
+- Pino logger with pino-pretty transport
+- Log levels: debug, info, warn, error
+- Console output with colored formatting
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Not configured in codebase
-- Fastify static file serving in production
+- Self-hosted (Fastify server)
+- Frontend served statically by Fastify in production
 
 **CI Pipeline:**
-- Not detected in current codebase
-- Package scripts include build and test commands
+- Not detected (no GitHub Actions, Travis, etc.)
 
 ## Environment Configuration
 
 **Required env vars:**
-- `LUCIA_PORT` - Server port
-- `LUCIA_HOST` - Server host
-- `CLICKHOUSE_HOST` - ClickHouse server
-- `CLICKHOUSE_PORT` - ClickHouse port
-- `CLICKHOUSE_DATABASE` - ClickHouse database name
-- `CLICKHOUSE_USERNAME` - ClickHouse username
-- `CLICKHOUSE_PASSWORD` - ClickHouse password
+- CLICKHOUSE_HOST - ClickHouse server host
+- CLICKHOUSE_PORT - ClickHouse server port (default: 9000)
+- CLICKHOUSE_DATABASE - ClickHouse database name
+- CLICKHOUSE_USERNAME - ClickHouse username
+- CLICKHOUSE_PASSWORD - ClickHouse password
+- LUCIA_PORT - Server port (default: 3000)
+- LUCIA_HOST - Server host (default: 0.0.0.0)
 
-**Optional env vars:**
-- `LUCIA_CONFIG` - Custom config file path
-- `LOG_LEVEL` - Logging level (default: info)
+**Secrets location:**
+- config.yaml (contains credentials)
+- Environment variables (recommended)
 
 ## Webhooks & Callbacks
 
-**Incoming:** None detected
-**Outgoing:** None detected
+**Incoming:**
+- None detected
+
+**Outgoing:**
+- None detected
+
+## Plugin Architecture
+
+**Store Plugins:**
+- Plugin-based architecture for trace storage
+- Current: ClickHouse trace store plugin
+- Support for metric and log plugins (configured but not implemented)
 
 ---
 
 *Integration audit: 2026-02-28*
-```

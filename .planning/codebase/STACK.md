@@ -5,82 +5,75 @@
 ## Languages
 
 **Primary:**
-- TypeScript ^5.0.0 - All packages use TypeScript
-  - `packages/core/src` - Backend server and plugins
-  - `packages/frontend/src` - Vue.js frontend application
-  - `packages/plugins/store-trace-clickhouse/src` - ClickHouse integration plugin
+- TypeScript 5.0.0 - All packages
+- JavaScript - No significant plain JS usage detected
+
+**Secondary:**
+- Vue.js 3.5.0 - Frontend framework (compiled to JS)
 
 ## Runtime
 
 **Environment:**
-- Node.js ^24.14.0 - Minimum required version
-- ES modules - All packages use `"type": "module"`
+- Node.js 24.14.0+ - Runtime environment
 
 **Package Manager:**
-- pnpm - Workspace-based monorepo management
-- Lockfile: pnpm-lock.yaml present
+- pnpm - Workspace package management
+- Lockfile: pnpm-lock.yaml (present in workspace root)
 
 ## Frameworks
 
-**Backend (Core):**
-- Fastify ^5.0.0 - Web framework for REST API
-  - Entry point: `packages/core/src/app.ts`
-  - Routes: `/api/traces`, `/api/services`, `/api/errors`, `/api/slow`
-  - Built-in CORS support with `@fastify/cors`
+**Core:**
+- Fastify 5.0.0 - Backend web framework
+- Vue 3.5.0 - Frontend UI framework
+- Vue Router 4.5.0 - Frontend routing
+- Element Plus 2.9.0 - UI component library
+- Pinia 3.0.0 - Frontend state management
 
-**Frontend:**
-- Vue ^3.5.0 - Progressive JavaScript framework
-  - Entry point: `packages/frontend/src/main.ts`
-  - Router: Vue Router ^4.5.0
-  - State: Pinia ^3.0.0
-  - UI: Element Plus ^2.9.0 with icons
+**Testing:**
+- Vitest 3.0.0 - Unit testing framework
+- jsdom 26.0.0 - DOM testing (frontend)
 
 **Build/Dev:**
-- Vite ^5.0.0 - Frontend build tool
-  - Config: `packages/frontend/vite.config.ts`
-  - Hot module replacement in development
-- tsx ^4.0.0 - TypeScript execution environment for development
+- Vite 5.0.0 - Frontend build tool
+- tsx 4.0.0 - TS runtime for development
+- vue-tsc 2.0.0 - Vue type checking
 
 ## Key Dependencies
 
 **Critical:**
-- @clickhouse/client ^1.0.0 - ClickHouse database client for trace storage
-- fastify ^5.0.0 - Web server framework
-- pino ^9.0.0 - Logging framework with pretty transport
+- @lucia/plugin-store-trace-clickhouse 0.1.0 - ClickHouse integration plugin
+- @clickhouse/client 1.0.0 - ClickHouse database client
+- axios 1.7.0 - HTTP client for frontend
 
 **Infrastructure:**
-- yaml ^2.0.0 - YAML configuration parsing
-- axios ^1.7.0 - HTTP client for frontend API calls
+- @fastify/cors 10.0.0 - CORS middleware
+- @fastify/static 8.0.0 - Static file serving
+- yaml 2.0.0 - YAML parsing
+- pino 9.0.0 - Logging framework
 
 ## Configuration
 
 **Environment:**
-- Config loaded from YAML files (`config.yaml`)
-  - Fallback paths: `config.yaml`, `../../config.yaml`, `../config.yaml`
-  - Environment variable overrides supported
-- Key env vars:
-  - `LUCIA_PORT` - Server port (default: 3000)
-  - `LUCIA_HOST` - Server host (default: 0.0.0.0)
-  - `CLICKHOUSE_*` - Database connection parameters
+- Config loaded from config.yaml (primary)
+- Environment variable overrides supported (LUCIA_*)
+- ClickHouse connection via CLICKHOUSE_* env vars
 
 **Build:**
 - TypeScript configuration in each package
-  - `packages/core/tsconfig.json`
-  - `packages/frontend/tsconfig.json`
-  - `packages/plugins/store-trace-clickhouse/tsconfig.json`
+- Vite configuration with path aliases (@)
+- ESLint with workspace-wide rules
 
 ## Platform Requirements
 
 **Development:**
-- Node.js ^24.14.0
+- Node.js >= 24.14.0
 - pnpm package manager
 
 **Production:**
-- Node.js ^24.14.0
-- ClickHouse database for trace storage
-- Optional: Static file serving for frontend
+- Node.js runtime
+- ClickHouse database instance
+- Frontend static file server (handled by Fastify)
 
 ---
 
 *Stack analysis: 2026-02-28*
-```

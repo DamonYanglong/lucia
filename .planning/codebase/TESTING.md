@@ -1,49 +1,38 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-02-28
+**Analysis Date:** 2024-12-28
 
 ## Test Framework
 
 **Runner:**
-- Vitest 3.0.0
-- Test files use .test.ts extension
-- Test runner config per package
+- Vitest v3.0.0
+- Config files: `packages/*/vitest.config.ts`
+- Global test functions enabled
 
 **Assertion Library:**
-- Built-in expect from vitest
-- No external assertion library used
+- Native Vitest assertions (`expect`, `describe`, `it`)
+- No additional assertion library detected
 
 **Run Commands:**
 ```bash
-# Core package
-npm test                # vitest
-npm run test:coverage  # vitest with coverage
-
-# Frontend package
-npm test                # vitest
-npm run test:coverage  # vitest with coverage
-
-# Plugin package
-npm test                # vitest
+pnpm test              # Run all tests
+pnpm --filter @lucia/core test  # Run specific package tests
+pnpm --filter @lucia/frontend test  # Run frontend tests
 ```
 
 ## Test File Organization
 
 **Location:**
-- Co-located with source files
-- Test files in same directory as implementation
-- Example: `plugin-loader.test.ts` alongside `plugin-loader.ts`
+- Co-located with source: `src/**/*.test.ts`
+- Test files maintain same directory structure as source
 
 **Naming:**
-- .test.ts suffix for all test files
-- Descriptive test file names
-- No separate test directories
+- `.test.ts` suffix: `plugin-loader.test.ts`
+- No `.spec.ts` files detected
 
 **Structure:**
 ```typescript
-// plugin-loader.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { loadPlugins } from './plugin-loader';
 
 describe('plugin-loader', () => {
   beforeEach(() => {
@@ -52,7 +41,7 @@ describe('plugin-loader', () => {
 
   describe('loadPlugins', () => {
     it('should return empty plugins when no config', async () => {
-      // Test implementation
+      // test implementation
     });
   });
 });
@@ -61,256 +50,168 @@ describe('plugin-loader', () => {
 ## Test Structure
 
 **Suite Organization:**
-- Group tests by functionality
-- describe blocks for logical grouping
-- it blocks for specific test cases
-- beforeEach for test cleanup
+- Top-level `describe` matches file/function name
+- Nested `describe` for logical groupings
+- Test names use "should" convention
+
+**Setup/Teardown:**
+- `beforeEach` for clearing mocks
+- `afterEach` when needed (e.g., plugin cleanup)
+- No global setup detected
 
 **Patterns:**
-```typescript
-describe('plugin-loader', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe('loadPlugins', () => {
-    it('should return empty plugins when no config', async () => {
-      const plugins = await loadPlugins({});
-
-      expect(plugins).toEqual({});
-      expect(plugins.trace).toBeUndefined();
-      expect(plugins.metric).toBeUndefined();
-      expect(plugins.log).toBeUndefined();
-    });
-  });
-});
-```
+- Async/await for async operations
+- Mock setup in `beforeEach`
+- Clear assertions with `.toBe()`, `.toEqual()`, etc.
 
 ## Mocking
 
 **Framework:**
-- vi.mock from vitest
-- vi.fn() for function mocks
-- vi.clearAllMocks() in beforeEach
+- Vi mocking utilities (`vi.fn()`, `vi.mock()`)
+- Test-specific mocks with `doMock()`
 
-**Mock Patterns:**
+**Patterns:**
 ```typescript
-// Dynamic import mocking
-vi.mock('@lucia/plugin-store-trace-clickhouse', () => ({
-  default: {
-    name: 'clickhouse',
-    init: vi.fn().mockResolvedValue(undefined),
-    close: vi.fn().mockResolvedValue(undefined),
-  },
+// Static mock
+vi.mock('@clickhouse/client', () => ({
+  createClient: vi.fn(() => mockClient),
 }));
 
-// Function mocking
-const mockInit = vi.fn().mockResolvedValue(undefined);
+// Dynamic mock
+vi.doMock('@lucia/plugin-store-trace-clickhouse', () => ({
+  default: {
+    name: 'clickhouse',
+    init: mockInit,
+  },
+}));
 ```
 
 **What to Mock:**
-- External dependencies (clickhouse client)
+- External dependencies (ClickHouse client)
 - Dynamic imports
-- Plugin interfaces
-- Time-based operations
+- Time-sensitive operations
 
 **What NOT to Mock:**
-- Core business logic
-- Type definitions
-- Simple utility functions
-- Vue reactive systems in frontend
+- Pure utility functions
+- TypeScript interfaces/types
+- Simple data transformations
 
 ## Fixtures and Factories
 
 **Test Data:**
+- Defined inline in test files
+- No separate fixture files detected
+- Complex test data in `packages/frontend/src/api/index.test.ts`
+
+**Example:**
 ```typescript
-// API test fixtures
 const mockSpans: Span[] = [
   {
     timestamp: '2024-01-01T00:00:00.000Z',
     traceId: 'trace-1',
-    spanId: 'span-1',
-    parentSpanId: null,
-    spanName: 'HTTP GET /api/users',
-    spanKind: 'SERVER',
-    serviceName: 'user-service',
-    duration: 100000000,
-    statusCode: 'Ok',
-    statusMessage: '',
-    spanAttributes: {},
-    resourceAttributes: {},
-    events: [],
-    links: [],
-  },
+    // ... complete span data
+  }
 ];
 ```
 
 **Location:**
-- Defined inline in test files
-- No separate test data utilities
-- Minimal fixtures for each test
+- Test data defined at top of test files
+- Shared constants for related tests
 
 ## Coverage
 
 **Requirements:**
-- V8 coverage provider
-- Multi-format output: text, json, html
-- Coverage excludes test files and entry points
+- Target coverage: Not explicitly defined
+- Minimum coverage: Not enforced
+- Coverage provider: V8
 
 **View Coverage:**
 ```bash
-# Core package coverage
-npm run test:coverage
-
-# Coverage reports generated in:
-# - text: terminal output
-# - json: dist/coverage/coverage.json
-# - html: dist/coverage/index.html
+# Not explicitly configured in vitest.config.ts
+# V8 coverage runs with tests
 ```
 
 **Coverage Configuration:**
-```typescript
-// vitest.config.ts
-coverage: {
-  provider: 'v8',
-  reporter: ['text', 'json', 'html'],
-  include: ['src/**/*.ts'],
-  exclude: ['src/**/*.test.ts', 'src/app.ts'],
-}
-```
+- Include: `['src/**/*.ts']`
+- Exclude: `['src/**/*.test.ts', 'src/app.ts']`
+- Reporter: ['text', 'json', 'html']
 
 ## Test Types
 
 **Unit Tests:**
-- Focus on individual functions and utilities
-- Mock external dependencies
-- Isolated test environment
-- Examples:
-  - `plugin-loader.test.ts`
-  - `api/index.test.ts`
+- Scope: Individual functions and components
+- Location: `packages/core/src/store/plugin-loader.test.ts`
+- Coverage: Plugin loading logic
 
 **Integration Tests:**
-- Test API endpoints with plugin integration
-- Test plugin initialization and configuration
-- Limited integration tests currently present
+- Scope: API endpoints, database operations
+- Coverage: ClickHouse plugin integration
+- Mock external dependencies
 
 **E2E Tests:**
-- Not implemented
-- Playwright not configured
-- Frontend testing limited to unit tests
+- Status: Not implemented
+- Framework: Not configured
 
 ## Common Patterns
 
 **Async Testing:**
 ```typescript
 it('should load trace plugin', async () => {
-  const config = {
-    trace: {
-      plugin: 'clickhouse',
-      config: { host: 'localhost', port: 8123 },
-    },
-  };
-
   const plugins = await loadPlugins(config);
-
   expect(plugins.trace).toBeDefined();
-  expect(plugins.trace!.name).toBe('clickhouse');
 });
 ```
 
 **Error Testing:**
 ```typescript
 it('should handle plugin init failure gracefully', async () => {
-  vi.doMock('@lucia/plugin-store-trace-clickhouse', () => ({
-    default: {
-      name: 'failing-plugin',
-      init: vi.fn().mockRejectedValue(new Error('Connection failed')),
-    },
-  }));
-
-  const config = { trace: { plugin: 'clickhouse', config: { host: 'invalid-host' } } };
-
   await expect(loadPlugins(config)).rejects.toThrow();
 });
 ```
 
-**Vue Component Testing:**
-- Limited component testing implemented
-- Components tested for logic (time filters, service filters)
-- DOM interaction testing not present
-
-**Store Testing:**
-- Pinia stores tested for basic functionality
-- State mutations and getters tested
-- Computed properties tested
-
-## Test Environment
-
-**Core Package:**
-- Environment: node
-- Globals enabled
-- No browser APIs required
-
-**Frontend Package:**
-- Environment: jsdom
-- Globals enabled
-- Vue 3 and Element Plus available
-
-**Plugin Package:**
-- Environment: node
-- Globals enabled
-- ClickHouse client mocked
-
-## Test Isolation
-
-**BeforeEach Pattern:**
+**Mock Setup:**
 ```typescript
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
 });
 ```
 
-**Test Independence:**
+**Paginated Response Testing:**
+```typescript
+const result = await plugin.getTraces({...});
+expect(result.list).toHaveLength(1);
+expect(result.total).toBe(100);
+expect(result.page).toBe(1);
+```
+
+## Testing Challenges
+
+**Mocking Complexity:**
+- ClickHouse client mock requires nested structure
+- JSON response mocking needed for multiple queries
+- Time-based queries need careful mock setup
+
+**Test Isolation:**
+- Good isolation with `vi.clearAllMocks()`
+- Plugin initialization state needs careful management
 - No shared state between tests
-- Fresh mock setup for each test
-- Isolated plugin loading logic
 
-## Current Test Coverage
+**Edge Cases Covered:**
+- Empty results
+- Error conditions
+- Null/undefined inputs
+- Multiple root spans
+- Orphan spans in tree building
 
-**Core Package:**
-- Plugin loader functionality tested
-- Error handling covered
-- Plugin interfaces tested
-- API routes not fully tested
+## Areas for Improvement
 
-**Frontend Package:**
-- API utility functions tested (span tree building, formatting)
-- Pinia stores tested for state management
-- Vue components minimally tested
-- API integration tests missing
+**Coverage:**
+- No test configuration files (vitest.config.ts varies by package)
+- Inconsistent coverage reporting setup
+- E2E tests missing
+- API integration tests missing real HTTP calls
 
-**Plugin Package:**
-- ClickHouse plugin interface tested
-- Plugin loading covered
-- Actual ClickHouse integration not tested
-
-## Testing Gaps
-
-**Missing Coverage:**
-- API endpoint integration tests
-- Frontend component user interactions
-- Error boundary testing
-- Authentication/authorization flows
-- Performance-related tests
-- Multi-plugin scenarios
-
-**Priority Areas for Improvement:**
-- E2E tests for critical user flows
-- API integration with real plugin backends
-- Component testing with user interactions
-- Load testing for performance
-- Security-focused tests
-
----
-
-*Testing analysis: 2026-02-28*
+**Mocking:**
+- Complex nested mocks for database responses
+- Time-dependent tests could benefit from time mocking
+- No fixture management system

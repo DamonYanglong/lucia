@@ -4,115 +4,124 @@
 
 ## Pattern Overview
 
-**Overall:** Monorepo with plugin-based microservices architecture
+**Overall:** Monorepo with Plugin-Based Architecture
 
 **Key Characteristics:**
-- Workspace-based monorepo (pnpm)
-- Plugin-based storage system for trace data
-- Fastify backend with Vue 3 frontend
-- ClickHouse as primary data store
-- OpenTelemetry trace data format
+- Frontend/backend separation with shared TypeScript types
+- Plugin-based storage system for extensible data persistence
+- Fastify HTTP server with RESTful API design
+- Vue 3 frontend with Element Plus UI library
+- TypeScript throughout for type safety
 
 ## Layers
 
 **Core Backend Layer:**
-- Purpose: Main application server and API endpoints
+- Purpose: API server, plugin management, business logic
 - Location: `packages/core/src/`
-- Contains: Fastify server, routes, configuration, plugin system
-- Depends on: Store plugins, Fastify framework
-- Used by: Frontend via HTTP API
-
-**Storage Plugin Layer:**
-- Purpose: Abstract data storage implementation
-- Location: `packages/plugins/store-trace-clickhouse/src/`
-- Contains: ClickHouse trace store plugin
-- Depends on: ClickHouse client, core types
-- Used by: Core backend for data operations
+- Contains: Server entry, routes, store interfaces, configuration
+- Depends on: Fastify framework, ClickHouse plugin
+- Used by: Frontend (via HTTP API)
 
 **Frontend Layer:**
-- Purpose: UI for viewing traces, errors, and metrics
+- Purpose: User interface, user interaction, data visualization
 - Location: `packages/frontend/src/`
 - Contains: Vue components, views, stores, API client
-- Depends on: Vue ecosystem, Element Plus, Axios
-- Used by: End users via browser
+- Depends on: Vue 3, Element Plus, Pinia state management
+- Used by: End users (browser)
 
-**Type System Layer:**
-- Purpose: Shared TypeScript definitions
+**Plugin Layer:**
+- Purpose: Data storage implementations
+- Location: `packages/plugins/`
+- Contains: Store plugins (ClickHouse, potential future plugins)
+- Depends on: Core interfaces
+- Used by: Core (for data persistence)
+
+**Shared Layer:**
+- Purpose: Type definitions and common utilities
 - Location: `packages/core/src/types/`
-- Contains: Trace, Service, Error, SlowCall type definitions
-- Depends on: TypeScript compiler
-- Used by: All packages (types exported)
+- Contains: Shared TypeScript interfaces
+- Depends on: Nothing
+- Used by: Core, Frontend, Plugins
 
 ## Data Flow
 
-**Trace Data Ingestion:**
-1. OpenTelemetry traces stored in ClickHouse
-2. ClickHouse plugin provides storage abstraction
-3. Core server loads plugin at startup
-4. Routes expose data via REST API endpoints
+**1. API Request Flow:**
+```
+Frontend (HTTP) → Fastify Routes → Store Plugins → Database
+```
 
-**User Query Flow:**
+**2. Plugin Loading:**
+```
+Server Startup → Load Config → Load Plugins → Register Routes
+```
 
-1. Frontend makes API request with query parameters
-2. Backend route calls appropriate store method
-3. Store plugin executes ClickHouse query
-4. Results returned to frontend with pagination
+**3. Trace Data Flow:**
+```
+OpenTelemetry Data → ClickHouse → Plugin Interface → API Response → Frontend Display
+```
 
 **State Management:**
-- Frontend: Pinia for filter state and UI state
-- Backend: Fastify request-scoped state
-- Storage: Plugin instances with connection pooling
+- Frontend: Pinia stores (filter, trace data)
+- Backend: Store plugins handle state persistence
+- No global state sharing across layers
 
 ## Key Abstractions
 
-**StorePlugin Interface:**
-- Purpose: Abstract different storage backends
+**Store Plugin Interface:**
+- Purpose: Abstract data storage behind common interface
 - Examples: `packages/core/src/store/interface.ts`
-- Pattern: Plugin architecture with type registration
+- Pattern: Interface segregation for different data types (trace, metrics, logs)
 
-**PaginatedResult:**
-- Purpose: Standardized paginated response format
-- Examples: `packages/core/src/types/index.ts` (lines 118-123)
-- Pattern: Generic type with pagination metadata
+**Query Objects:**
+- Purpose: Encapsulate filtering and pagination parameters
+- Examples: `TraceQuery`, `ServiceQuery`, `ErrorQuery`
+- Pattern: Immutable objects with validation
 
-**Trace Query Types:**
-- Purpose: Standardized query parameters
-- Examples: TraceQuery, ServiceQuery, ErrorQuery, SlowQuery
-- Pattern: Strongly-typed query objects with validation
+**Paginated Result:**
+- Purpose: Standardized response format for paginated data
+- Examples: `PaginatedResult<T>` interface
+- Pattern: Consistent across all endpoints
 
 ## Entry Points
 
-**Backend Server:**
+**Backend Entry Point:**
 - Location: `packages/core/src/app.ts`
-- Triggers: `pnpm dev` command
-- Responsibilities: Fastify server setup, plugin loading, route registration
+- Triggers: Server startup, plugin loading, route registration
+- Responsibilities: Fastify server initialization, CORS, static files
 
-**Frontend Dev Server:**
-- Location: `packages/frontend/src/main.js` (generated)
-- Triggers: `pnpm dev:frontend` command
-- Responsibilities: Vue development server with hot reload
+**Frontend Entry Point:**
+- Location: `packages/frontend/src/main.ts`
+- Triggers: Vue app creation, state setup, routing
+- Responsibilities: App initialization, plugin registration, mounting
 
-**Plugin System:**
-- Location: `packages/core/src/store/plugin-loader.ts`
-- Triggers: Application startup
-- Responsibilities: Dynamic plugin discovery and loading
+**Plugin Entry Point:**
+- Location: `packages/plugins/store-trace-clickhouse/src/index.ts`
+- Triggers: Plugin initialization with ClickHouse client
+- Responsibilities: Database connection, query implementation
 
 ## Error Handling
 
-**Strategy:** Centralized error handling with Fastify error handlers
+**Strategy:** Centralized error handling with status codes
 
 **Patterns:**
-- Try/catch in route handlers
-- Fastify error registration for global error handling
-- Plugin-specific error logging
-- Graceful degradation when plugins fail
+- API responses use standardized format: `{ code: number, message?: string, data?: any }`
+- Store plugins check availability before operations
+- Fastify handles HTTP errors with appropriate status codes
 
 ## Cross-Cutting Concerns
 
-**Logging:** Pino logger with pretty printing in dev
-**Validation:** TypeScript types + runtime validation in queries
-**Authentication:** Not implemented (Open for future)
-**CORS:** Enabled for all origins
+**Logging:**
+- Backend: Pino logger with pretty transport
+- Frontend: Console logging with Element Plus UI
+
+**Validation:**
+- Input validation via TypeScript interfaces
+- Query parameters validated at route level
+- Plugin configuration validated during initialization
+
+**Authentication:**
+- Not implemented yet
+- CORS configured for development
 
 ---
 
