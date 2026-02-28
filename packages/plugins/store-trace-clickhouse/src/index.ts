@@ -1,3 +1,4 @@
+import { QueryCache } from './cache';
 import { createClient } from '@clickhouse/client';
 import type { ITraceStorePlugin } from '@lucia/core';
 import type {
@@ -44,6 +45,8 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
 
   private client: ReturnType<typeof createClient> | null = null;
   private config: ClickHouseConfig | null = null;
+  private cache: QueryCache = new QueryCache(300);
+
 
   async init(config: Record<string, unknown>): Promise<void> {
     this.config = config as unknown as ClickHouseConfig;
@@ -105,6 +108,12 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
   }
 
   async getServices(query: ServiceQuery): Promise<Service[]> {
+    // Check cache first
+    const cacheKey = QueryCache.generateKey('services', query);
+    const cached = this.cache.get<Service[]>(cacheKey);
+    if (cached) return cached;
+
+
     const client = this.ensureClient();
 
     const sql = `
@@ -129,7 +138,12 @@ export class ClickHouseTracePlugin implements ITraceStorePlugin {
       });
 
       const data = await result.json() as { data?: Service[] };
-      return data.data || [];
+      const services = data.data || [];
+
+      // Cache for 1 minute
+      this.cache.set(cacheKey, services, 60);
+
+      return services;
     } catch (error) {
       throw new ClickHouseError('getServices', 'Failed to query services', error);
     }
