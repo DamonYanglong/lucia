@@ -1,0 +1,24 @@
+{
+  "name": "@lucia/plugin-store-metadata-pg",
+  "version": "0.1.0",
+  "description": "PostgreSQL metadata store plugin for Lucia",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0"
+  },
+  "peerDependencies": {
+    "@lucia/core": "workspace:*"
+  }
+}

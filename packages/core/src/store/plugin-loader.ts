@@ -41,7 +41,7 @@ async function loadPlugin(type: 'trace' | 'metadata' | 'metric' | 'log', name: s
   // Built-in plugins
   const builtin: Record<string, string[]> = {
     trace: ['clickhouse'],
-    metadata: ['sqlite'],
+    metadata: ['sqlite', 'postgres'],
     metric: ['prometheus'],
     log: ['clickhouse'],
   };
