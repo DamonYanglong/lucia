@@ -3,6 +3,7 @@ import { ClickHouseTracePlugin } from './index.js';
 
 // Mock ClickHouse client
 const mockClient = {
+  ping: vi.fn(),
   query: vi.fn(),
   close: vi.fn(),
 };
@@ -34,12 +35,11 @@ describe('ClickHouseTracePlugin', () => {
 
   describe('getServices', () => {
     it('should return list of services with stats', async () => {
-      // getServices returns result.json() directly (not .data)
       mockClient.query.mockResolvedValueOnce({
-        json: async () => [
+        json: async () => ({ data: [
           { name: 'user-service', requestCount: 100, errorCount: 5, avgDuration: 150000000 },
           { name: 'order-service', requestCount: 50, errorCount: 10, avgDuration: 200000000 },
-        ],
+        ]}),
       });
 
       const services = await plugin.getServices({
@@ -55,7 +55,7 @@ describe('ClickHouseTracePlugin', () => {
 
     it('should return empty array when no services', async () => {
       mockClient.query.mockResolvedValueOnce({
-        json: async () => [],
+        json: async () => ({ data: [] }),
       });
 
       const services = await plugin.getServices({
