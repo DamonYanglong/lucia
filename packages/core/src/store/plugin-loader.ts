@@ -13,6 +13,13 @@ export async function loadPlugins(storeConfig: StoreConfig): Promise<StorePlugin
     plugins.trace = tracePlugin;
   }
 
+  // Load Metadata plugin
+  if (storeConfig.metadata) {
+    const metadataPlugin = await loadPlugin('metadata', storeConfig.metadata.plugin);
+    await metadataPlugin.init(storeConfig.metadata.config);
+    plugins.metadata = metadataPlugin;
+  }
+
   // Load Metric plugin (future)
   if (storeConfig.metric) {
     const metricPlugin = await loadPlugin('metric', storeConfig.metric.plugin);
@@ -30,10 +37,11 @@ export async function loadPlugins(storeConfig: StoreConfig): Promise<StorePlugin
   return plugins;
 }
 
-async function loadPlugin(type: 'trace' | 'metric' | 'log', name: string): Promise<any> {
+async function loadPlugin(type: 'trace' | 'metadata' | 'metric' | 'log', name: string): Promise<any> {
   // Built-in plugins
   const builtin: Record<string, string[]> = {
     trace: ['clickhouse'],
+    metadata: ['sqlite'],
     metric: ['prometheus'],
     log: ['clickhouse'],
   };

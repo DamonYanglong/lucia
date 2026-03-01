@@ -52,6 +52,7 @@ async function main() {
   await fastify.register(import('./routes/errors'), { prefix: '/api' });
   await fastify.register(import('./routes/slow'), { prefix: '/api' });
   await fastify.register(import('./routes/settings'), { prefix: '/api' });
+  await fastify.register(import('./routes/metadata'), { prefix: '/api' });
   
   // Health check
   fastify.get('/health', async () => ({ status: 'ok' }));

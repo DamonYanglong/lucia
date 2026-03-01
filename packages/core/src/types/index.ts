@@ -121,3 +121,10 @@ export interface PaginatedResult<T> {
   page: number;
   pageSize: number;
 }
+
+// Metadata types
+export type {
+  ServiceMetadata,
+  MetadataQuery,
+  ServiceWithMetadata,
+} from './metadata';

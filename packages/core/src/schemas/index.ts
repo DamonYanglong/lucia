@@ -100,3 +100,53 @@ export type ServiceQuerySchema = z.infer<typeof serviceQuerySchema>;
 export type ErrorQuerySchema = z.infer<typeof errorQuerySchema>;
 export type SlowQuerySchema = z.infer<typeof slowQuerySchema>;
 export type TraceIdParamsSchema = z.infer<typeof traceIdParamsSchema>;
+
+// ============ Metadata Schemas ============
+
+// Environment enum
+const environmentEnum = z.enum(['dev', 'staging', 'prod', 'other']).optional();
+
+// Status enum
+const metadataStatusEnum = z.enum(['active', 'deprecated', 'maintenance']).optional();
+
+// Source enum
+const sourceEnum = z.enum(['auto', 'manual']).optional();
+
+// Service name param schema
+export const serviceNameParamsSchema = z.object({
+  serviceName: serviceNameSchema,
+});
+
+// Metadata query schema
+export const metadataQuerySchema = z.object({
+  environment: z.string().max(64).optional(),
+  owner: z.string().max(256).optional(),
+  status: z.string().max(32).optional(),
+  search: z.string().max(256).optional(),
+});
+
+// Service metadata body schema (for upsert)
+export const serviceMetadataBodySchema = z.object({
+  displayName: z.string().max(256).optional(),
+  description: z.string().max(2000).optional(),
+  environment: environmentEnum,
+  owner: z.string().max(256).optional(),
+  team: z.string().max(256).optional(),
+  ips: z.array(z.string().max(64)).max(100).optional(),
+  repository: z.string().url().max(512).optional(),
+  tags: z.record(z.string().max(256)).optional(),
+  status: metadataStatusEnum,
+}).strict();
+
+// Batch import schema
+export const batchMetadataSchema = z.object({
+  items: z.array(serviceMetadataBodySchema.extend({
+    serviceName: serviceNameSchema,
+  })).max(100),
+}).strict();
+
+// Type exports for metadata schemas
+export type MetadataQuerySchema = z.infer<typeof metadataQuerySchema>;
+export type ServiceNameParamsSchema = z.infer<typeof serviceNameParamsSchema>;
+export type ServiceMetadataBodySchema = z.infer<typeof serviceMetadataBodySchema>;
+export type BatchMetadataSchema = z.infer<typeof batchMetadataSchema>;

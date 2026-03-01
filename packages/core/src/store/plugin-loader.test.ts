@@ -10,6 +10,14 @@ vi.mock('@lucia/plugin-store-trace-clickhouse', () => ({
   },
 }));
 
+vi.mock('@lucia/plugin-store-metadata-sqlite', () => ({
+  default: {
+    name: 'sqlite',
+    init: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 describe('plugin-loader', () => {
   beforeEach(() => {
     vi.clearAllMocks();

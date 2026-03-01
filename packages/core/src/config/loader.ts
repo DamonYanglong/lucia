@@ -13,6 +13,10 @@ export interface Config {
       plugin: string;
       config: Record<string, unknown>;
     };
+    metadata?: {
+      plugin: string;
+      config: Record<string, unknown>;
+    };
     metric?: {
       plugin: string;
       config: Record<string, unknown>;
