@@ -595,4 +595,16 @@ const stats = computed(() => {
 :deep(.el-table__row:hover > td) {
   background: var(--bg-tertiary) !important;
 }
+
+/* Selected row highlight style */
+:deep(.el-table__row.current-row > td) {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border-left: 3px solid #3b82f6;
+}
+
+:deep(.el-table__row.current-row .span-name),
+:deep(.el-table__row.current-row .duration),
+:deep(.el-table__row.current-row .service-tag) {
+  color: var(--text-primary);
+}
 </style>

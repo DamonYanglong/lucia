@@ -9,7 +9,7 @@ export const useFilterStore = defineStore('filter', () => {
 
   function formatDateTime(date: Date): string {
     // Format: YYYY-MM-DD HH:MM:SS (ClickHouse compatible)
-    return date.toISOString().replace('T', ' ').substring(0, 19);
+    return date.toISOString();
   }
 
   const startTime = computed(() => {

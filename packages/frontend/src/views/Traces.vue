@@ -107,7 +107,7 @@ async function loadTraces() {
 
 function formatDateTime(date: Date | string): string {
   if (typeof date === 'string') return date;
-  return date.toISOString().replace('T', ' ').substring(0, 19);
+  return date.toISOString();
 }
 
 function parseDuration(input: string): string {
@@ -204,7 +204,6 @@ function search() {
           start-placeholder="Start"
           end-placeholder="End"
           format="MM-DD HH:mm"
-          value-format="YYYY-MM-DD HH:mm:ss"
           style="width: 360px"
         />
         
